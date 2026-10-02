@@ -142,10 +142,6 @@ jobs:
           --health-timeout 5s
           --health-retries 10
 
-    defaults:
-      run:
-        working-directory: services/gateway
-
     env:
       DATABASE_DSN: postgres://postgres:postgres@localhost:5432/orchestrator
       REDIS_ADDR: localhost:6379
@@ -164,10 +160,10 @@ jobs:
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
+          cache: pip
 
       - name: Install Python deps (schema init only)
-        run: pip install -r ../../requirements.txt
-        working-directory: .
+        run: pip install -r requirements.txt
 
       - name: Initialise database schema
         env:
@@ -184,13 +180,14 @@ jobs:
                   await conn.run_sync(Base.metadata.create_all)
           asyncio.run(init())
           EOF
-        working-directory: ../../
 
       - name: Run native Go unit and integration tests with race detector
         run: go test -v -race -count=1 ./...
+        working-directory: services/gateway
 
       - name: Build gateway binary
         run: go build -o /tmp/gateway ./cmd/gateway/
+        working-directory: services/gateway
 
       - name: Start gateway in background
         run: |

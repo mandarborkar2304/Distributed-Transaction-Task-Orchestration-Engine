@@ -17,3 +17,4 @@ services/gateway/gateway
 services/gateway/worker
 *.exe
 
+docs/DESIGN_AND_ARCHITECTURE_DECISIONS.md
