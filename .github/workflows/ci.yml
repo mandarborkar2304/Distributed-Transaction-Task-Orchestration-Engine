@@ -145,6 +145,7 @@ jobs:
     env:
       DATABASE_DSN: postgres://postgres:postgres@localhost:5432/orchestrator
       REDIS_ADDR: localhost:6379
+      PGPOOL_MAX_CONNS: "30"
 
     steps:
       - name: Checkout repository
@@ -182,7 +183,7 @@ jobs:
           EOF
 
       - name: Run native Go unit and integration tests with race detector
-        run: go test -v -race -count=1 ./...
+        run: go test -v -race -count=1 -p 1 ./...
         working-directory: services/gateway
 
       - name: Build gateway binary

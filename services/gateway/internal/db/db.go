@@ -47,12 +47,23 @@ func New(ctx context.Context, dsn string) (*Pool, error) {
 		var pgMaxConns int
 		row := singleConn.QueryRow(ctx, "SHOW max_connections")
 		if scanErr := row.Scan(&pgMaxConns); scanErr == nil && pgMaxConns > 0 {
-			safeLimit := int32(pgMaxConns - 15) // reserve 15 for superuser/watchdog/other clients
+			// For low-limit environments (e.g. CI runners with max_connections=100), allocate at most
+			// 40% of available connections to a single pool instance so multiple pools (gateway + worker)
+			// never starve each other or hit SQLSTATE 53300.
+			var safeLimit int32
+			if pgMaxConns <= 100 {
+				safeLimit = int32(pgMaxConns * 4 / 10) // 40 max conns in 100-limit Postgres
+			} else {
+				safeLimit = int32(pgMaxConns - 25)
+			}
 			if safeLimit > 0 && cfg.MaxConns > safeLimit {
 				cfg.MaxConns = safeLimit
 			}
-			if cfg.MinConns > cfg.MaxConns {
-				cfg.MinConns = cfg.MaxConns / 2
+			if cfg.MinConns > cfg.MaxConns/2 {
+				cfg.MinConns = cfg.MaxConns / 4
+				if cfg.MinConns < 2 {
+					cfg.MinConns = 2
+				}
 			}
 		}
 		_ = singleConn.Close(ctx)
