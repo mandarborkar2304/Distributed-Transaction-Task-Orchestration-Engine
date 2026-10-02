@@ -1,8 +1,14 @@
 [![CI](https://github.com/mandarborkar2304/Distributed-Transaction-Task-Orchestration-Engine/actions/workflows/ci.yml/badge.svg)](https://github.com/mandarborkar2304/Distributed-Transaction-Task-Orchestration-Engine/actions/workflows/ci.yml)
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Interactive_Visualizer-00DC82?style=for-the-badge&logo=githubpages&logoColor=white)](https://mandarborkar2304.github.io/Distributed-Transaction-Task-Orchestration-Engine/)
 
 # Distributed Transaction & Task Orchestration Engine
 
+[![Live Demo](https://img.shields.io/badge/Live_Demo-Interactive_Visualizer-00DC82?style=for-the-badge&logo=githubpages&logoColor=white)](https://mandarborkar2304.github.io/Distributed-Transaction-Task-Orchestration-Engine/)
+
 A production-grade, polyglot (Go + Python) cloud-native task orchestration system engineered for **20,000,000+ user scale**. Delivers **guaranteed at-least-once execution**, **worker starvation prevention**, and **two-tier idempotent deduplication** — powered by PostgreSQL 16, Redis 7, Go concurrency runtimes, and Python asyncio.
+
+> 🚀 **Live Interactive Demo**: Experience the zero-dependency real-time architecture visualizer, traffic simulation (1,133+ req/s), and chaos fault injection console in your browser:  
+> **[Launch Interactive Dashboard →](https://mandarborkar2304.github.io/Distributed-Transaction-Task-Orchestration-Engine/)**
 
 ---
 
@@ -22,48 +28,48 @@ This engine eliminates all three failure modes with a hardened architecture comb
 
 ```mermaid
 flowchart TD
-    subgraph ClientLayer [External Clients & Webhook Emitters]
+    subgraph ClientLayer ["External Clients & Webhook Emitters"]
         Client["Client / Webhook Emitters<br/><i>(POST /v1/jobs with Idempotency-Key)</i>"]
     end
 
-    subgraph IngestionPlane [Ingestion Plane]
+    subgraph IngestionPlane ["Ingestion Plane"]
         GoGW["Go Ingestion Gateway (:8080)<br/>• Goroutine-per-request M:N scheduling<br/>• pgxpool (Max: 150, Min: 25)<br/>• go-redis multiplexed pool (500 conns)"]
         PyAPI["Python FastAPI Gateway (:8000)<br/>• Uvicorn multi-worker cluster<br/>• SQLAlchemy asyncpg pool<br/>• Compatibility & Admin Tier"]
     end
 
-    subgraph StorageState [State & Storage Plane]
-        Redis["Redis 7 (Standalone / Cluster)<br/>• Fast-Path Deduplication (idemp:{key} TTL 24h)<br/>• Distributed Lock Leases (lock:task:{id} EX 60s)<br/>• Atomic Lua CAS Unlock Script"]
+    subgraph StorageState ["State & Storage Plane"]
+        Redis["Redis 7 (Standalone / Cluster)<br/>• Fast-Path Deduplication (idemp:key TTL 24h)<br/>• Distributed Lock Leases (lock:task:id EX 60s)<br/>• Atomic Lua CAS Unlock Script"]
         Postgres["PostgreSQL 16 Engine<br/>• Transactional Outbox (jobs + job_tasks)<br/>• Unique Index: ix_jobs_idempotency_key<br/>• Partial Index: ix_job_tasks_pending_running<br/>• Monthly Range Partitioning (20M+ rows)"]
     end
 
-    subgraph WorkerPlane [Worker Plane]
+    subgraph WorkerPlane ["Worker Plane"]
         GoWorkers["Go Worker Pool (cmd/worker)<br/>• Batch Claim (50 tasks): SKIP LOCKED<br/>• Autonomous time.NewTicker Heartbeats<br/>• Native Handlers (Compute / Payment)"]
         PyWorkers["Python Worker Sandbox<br/>• Asyncio claim loop (10 tasks): SKIP LOCKED<br/>• Heartbeat coroutine (10s intervals)<br/>• Delegated Python Handlers"]
     end
 
-    subgraph RecoveryPlane [Observability & Recovery Plane]
+    subgraph RecoveryPlane ["Observability & Recovery Plane"]
         Watchdog["Python Watchdog / Reaper Daemon<br/>• Sweeps every 15s for stale heartbeats (>30s)<br/>• Unconditional Redis lock eviction<br/>• Exponential backoff & DLQ promotion"]
         Prometheus["Prometheus Observability Engine (:9090)<br/>• Scrapes Go Gateway (:8080/metrics)<br/>• Scrapes Python API (:8000/metrics)"]
     end
 
-    Client -->|High Throughput| GoGW
-    Client -->|Admin / Compatibility| PyAPI
+    Client -->|"High Throughput"| GoGW
+    Client -->|"Admin / Compatibility"| PyAPI
 
-    GoGW -->|1. Check idemp:{key}| Redis
-    GoGW -->|2. Miss: Atomic Outbox Write| Postgres
-    PyAPI -->|1. Check idemp:{key}| Redis
-    PyAPI -->|2. Miss: Atomic Outbox Write| Postgres
+    GoGW -->|"1. Check idemp:key (Lua CAS)"| Redis
+    GoGW -->|"2. Miss: Atomic Outbox Write"| Postgres
+    PyAPI -->|"1. Check idemp:key (Lua CAS)"| Redis
+    PyAPI -->|"2. Miss: Atomic Outbox Write"| Postgres
 
-    GoWorkers -->|Atomic Batch Claim| Postgres
-    GoWorkers -->|Lease Lock & Heartbeat| Redis
-    PyWorkers -->|Atomic Batch Claim| Postgres
-    PyWorkers -->|Lease Lock & Heartbeat| Redis
+    GoWorkers -->|"Atomic Batch Claim"| Postgres
+    GoWorkers -->|"Lease Lock & Heartbeat"| Redis
+    PyWorkers -->|"Atomic Batch Claim"| Postgres
+    PyWorkers -->|"Lease Lock & Heartbeat"| Redis
 
-    Watchdog -->|Reap Stale Tasks| Postgres
-    Watchdog -->|Evict Stale Locks| Redis
+    Watchdog -->|"Reap Stale Tasks"| Postgres
+    Watchdog -->|"Evict Stale Locks"| Redis
 
-    Prometheus -.->|Scrape Metrics| GoGW
-    Prometheus -.->|Scrape Metrics| PyAPI
+    Prometheus -.->|"Scrape Metrics"| GoGW
+    Prometheus -.->|"Scrape Metrics"| PyAPI
 ```
 
 ---
@@ -165,16 +171,32 @@ As documented in [`docs/BENCHMARK_RESULTS.md`](docs/BENCHMARK_RESULTS.md#8-harde
 
 ## Quickstart
 
-### 1. Prerequisites
+### 1. Live Interactive Web Demo (Zero Install Required)
+
+Experience the dual-plane architecture, real-time 60 FPS directed spline particle topology, worker heartbeat countdowns, and interactive chaos fault injection directly in your browser:
+
+👉 **[Launch Interactive Systems Dashboard](https://mandarborkar2304.github.io/Distributed-Transaction-Task-Orchestration-Engine/)**
+
+- **Live / Simulation Modes**: Toggle between live polling (`:8080/metrics`) and real-time client traffic simulation.
+- **Chaos Fault Injection**: Crash worker nodes (`SIGKILL`), freeze Redis container (3.4s stall), or inject poison pills with automatic DLQ escalation.
+- **Microsecond Event Stream**: Real-time terminal log drawer with syntax highlighting.
+
+---
+
+### 2. Local Docker Compose Deployment
+
+#### Prerequisites
 
 - Docker & Docker Compose
 - Go 1.22+ (or Go 1.27+ toolchain)
 - Python 3.11+
 
-### 2. Launch Infrastructure Services
+#### Launch Infrastructure Services
 
 ```bash
 docker compose up -d postgres redis prometheus
+# Or using legacy docker-compose:
+# docker-compose up -d postgres redis prometheus
 ```
 
 This provisions:
@@ -199,7 +221,7 @@ print('Database tables initialized successfully.')
 "
 ```
 
-### 3. Run Ingestion Services
+#### Run Ingestion Services
 
 **Production Go Ingestion Gateway (Port 8080):**
 ```bash
@@ -209,15 +231,17 @@ REDIS_ADDR="localhost:6379" \
 GATEWAY_ADDR=":8080" \
 go run ./cmd/gateway/
 ```
-Metrics endpoint: `http://localhost:8080/metrics`
+- Metrics endpoint: `http://localhost:8080/metrics`
+- Built-in Demo Console: `http://localhost:8080/demo`
 
 **Python FastAPI Compatibility Service (Port 8000):**
 ```bash
 uvicorn src.main:app --host 0.0.0.0 --port 8000 --workers 2
 ```
-Metrics endpoint: `http://localhost:8000/metrics`
+- Metrics endpoint: `http://localhost:8000/metrics`
+- Built-in Demo Console: `http://localhost:8000/demo`
 
-### 4. Run Worker Pools & Watchdog
+#### Run Worker Pools & Watchdog
 
 **Go Worker Pool (`cmd/worker`):**
 ```bash
@@ -253,7 +277,7 @@ asyncio.run(Watchdog(interval=15, timeout=30).start())
 "
 ```
 
-### 5. Submit an Idempotent Job
+#### Submit an Idempotent Job
 
 ```bash
 # Ingestion via Go Gateway
@@ -277,13 +301,38 @@ Replaying the exact same request returns:
 ```
 Sub-millisecond fast-path response served directly from Redis without touching PostgreSQL.
 
-### 6. Run the Test Suites
+---
+
+### 3. Benchmark & 20M Scale Reproduction
+
+Reproduce empirical 20,000,000-user synthetic load and verify sub-second tail latency:
+
+```bash
+# 1. Run the Go multi-threaded load generator (20M synthetic keyspace, 500 VUs)
+go run scripts/benchmarks/loadgen.go \
+  -target http://localhost:8080 \
+  -vus 500 \
+  -duration 30s \
+  -users 20000000 \
+  -collision-rate 0.7 \
+  -hot-pool 1000
+
+# 2. Run the hardened k6 multi-scenario battery (1,500 VUs pool saturation + collision chaos)
+k6 run scripts/benchmarks/k6_hardened.js
+
+# 3. Run pgbench SKIP LOCKED row contention test (100 concurrent clients)
+bash scripts/benchmarks/run_pgbench_hardened.sh
+```
+
+---
+
+### 4. Run the Test Suites
 
 **Execute Go Native Tests with Race Detector:**
 ```bash
 cd services/gateway
-go test -race -v ./internal/...
-go vet ./internal/...
+go test -race -v -p 1 ./...
+go vet ./...
 ```
 
 **Execute Python Integration & Chaos Tests:**

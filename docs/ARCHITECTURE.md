@@ -25,41 +25,41 @@ The engine utilizes a dual-plane hybrid architecture:
 
 ```mermaid
 flowchart TD
-    subgraph Ingestion Tier
+    subgraph IngestionTier ["Ingestion Tier"]
         GoGW["Go Ingestion Gateway (:8080)<br/>• Goroutine-per-request M:N scheduling<br/>• pgxpool (Max: 150 conns)<br/>• go-redis pool (500 conns)"]
         PyAPI["Python FastAPI (:8000)<br/>• Uvicorn multi-worker cluster<br/>• SQLAlchemy asyncpg pool<br/>• Administration & Inspection"]
     end
 
-    subgraph State Tier
-        Redis["Redis 7-Alpine<br/>• Fast-Path Cache: idemp:{key}<br/>• Distributed Lock: lock:task:{id}<br/>• Atomic Lua CAS Unlock"]
+    subgraph StateTier ["State Tier"]
+        Redis["Redis 7-Alpine<br/>• Fast-Path Cache: idemp:key<br/>• Distributed Lock: lock:task:id<br/>• Atomic Lua CAS Unlock"]
         Postgres["PostgreSQL 16-Alpine<br/>• Transactional Outbox: jobs + job_tasks<br/>• Monthly Range Partitioning Ready<br/>• SKIP LOCKED Row Deconfliction"]
     end
 
-    subgraph Worker Tier
+    subgraph WorkerTier ["Worker Tier"]
         GoWorker["Go Worker Pool (cmd/worker)<br/>• 50-task batch claims via SKIP LOCKED<br/>• Autonomous time.NewTicker heartbeats<br/>• Sub-millisecond compute/payment dispatch"]
         PyWorker["Python Worker Sandbox (src/engine)<br/>• 10-task batch claims via SKIP LOCKED<br/>• asyncio.wait_for heartbeat renewal<br/>• Delegated Python handlers"]
     end
 
-    subgraph Recovery & Observability Tier
+    subgraph RecoveryTier ["Recovery & Observability Tier"]
         Watchdog["Python Watchdog Daemon<br/>• 15s poll interval for heartbeats > 30s<br/>• Unconditional Redis lock eviction<br/>• Exponential backoff & DLQ promotion"]
         Prometheus["Prometheus Server (:9090)<br/>• Scrapes Go :8080/metrics<br/>• Scrapes Python :8000/metrics"]
     end
 
-    GoGW -->|1. Sub-ms Check| Redis
-    GoGW -->|2. Miss: Atomic Outbox Write| Postgres
-    PyAPI -->|1. Sub-ms Check| Redis
-    PyAPI -->|2. Miss: Atomic Outbox Write| Postgres
+    GoGW -->|"1. Sub-ms Check"| Redis
+    GoGW -->|"2. Miss: Atomic Outbox Write"| Postgres
+    PyAPI -->|"1. Sub-ms Check"| Redis
+    PyAPI -->|"2. Miss: Atomic Outbox Write"| Postgres
 
-    GoWorker -->|Atomic Batch Claim| Postgres
-    GoWorker -->|Acquire / Renew Lock| Redis
-    PyWorker -->|Atomic Batch Claim| Postgres
-    PyWorker -->|Acquire / Renew Lock| Redis
+    GoWorker -->|"Atomic Batch Claim"| Postgres
+    GoWorker -->|"Acquire / Renew Lock"| Redis
+    PyWorker -->|"Atomic Batch Claim"| Postgres
+    PyWorker -->|"Acquire / Renew Lock"| Redis
 
-    Watchdog -->|Reap Stale Tasks| Postgres
-    Watchdog -->|Evict Stale Locks| Redis
+    Watchdog -->|"Reap Stale Tasks"| Postgres
+    Watchdog -->|"Evict Stale Locks"| Redis
 
-    Prometheus -.->|Scrape| GoGW
-    Prometheus -.->|Scrape| PyAPI
+    Prometheus -.->|"Scrape"| GoGW
+    Prometheus -.->|"Scrape"| PyAPI
 ```
 
 - **Ingestion Acceleration**: External clients route high-throughput write traffic directly to the Go Gateway (`:8080`), achieving **1,133+ req/s** sustained throughput with sub-second p95 latency under 500 concurrent virtual users.
@@ -353,16 +353,16 @@ The Python Watchdog daemon (`src/engine/watchdog.py`) is the autonomous safety n
 sequenceDiagram
     participant Worker as Go or Python Worker
     participant DB as PostgreSQL (job_tasks)
-    participant Redis as Redis (lock:task:{id})
+    participant Redis as Redis (lock:task:id)
     participant Watchdog as Python Watchdog Daemon
 
     Worker->>DB: Claim task via SKIP LOCKED (status=RUNNING, locked_by=worker_1)
-    Worker->>Redis: SET lock:task:{id} worker_1 NX EX 60
+    Worker->>Redis: SET lock:task:id worker_1 NX EX 60
     Note over Worker: Worker crashes or enters network partition
     Note over Worker: Heartbeats stop updating
     Note over DB,Watchdog: 30 seconds elapse without heartbeat
     Watchdog->>DB: SELECT FOR UPDATE SKIP LOCKED (heartbeat_at < NOW() - 30s)
-    Watchdog->>Redis: DEL lock:task:{id} (Forcible lock eviction)
+    Watchdog->>Redis: DEL lock:task:id (Forcible lock eviction)
     alt retry_count + 1 < max_retries
         Watchdog->>DB: UPDATE job_tasks SET status='PENDING', retry_count=retry_count+1, locked_by=NULL
     else retry_count + 1 >= max_retries

@@ -181,7 +181,7 @@ An advanced stress battery was conducted to evaluate system behavior beyond norm
 
 ```mermaid
 flowchart TD
-    subgraph Traffic Generation
+    subgraph TrafficGen ["Traffic Generation"]
         K6A["k6 Scenario A: 1,500 VUs (Burst/Pool Saturation)"]
         K6B["k6 Scenario B: 1,000 VUs (20 Hot Keys + Redis Chaos)"]
         K6C["k6 Scenario C: 500 VUs (1-50 KB Payloads + Error Audit)"]
@@ -189,23 +189,26 @@ flowchart TD
         PGB2["pgbench Test 2: 100 Clients (Atomic Outbox Saturation)"]
     end
 
-    subgraph Go Gateway [Go Gateway :8080]
+    subgraph GoGW ["Go Gateway (:8080)"]
         Router["M:N Goroutine Router"]
         IdemHandler["Idempotency Fast-Path Handler"]
         Pool["pgxpool (Max: 150, Min: 25)"]
     end
 
-    subgraph Infrastructure
+    subgraph InfraPlane ["Infrastructure Plane"]
         Redis["Redis 7 (Fast-Path / Locks)<br/>Docker Pause: 3.42s Chaos"]
         PG["PostgreSQL 16 Engine<br/>(jobs + job_tasks Outbox)"]
     end
 
-    K6A & K6B & K6C --> Router
+    K6A --> Router
+    K6B --> Router
+    K6C --> Router
     Router --> IdemHandler
-    IdemHandler -- "Cache Check / Set" --> Redis
-    IdemHandler -- "Cache Miss / Fallback" --> Pool
+    IdemHandler -->|"Cache Check / Set"| Redis
+    IdemHandler -->|"Cache Miss / Fallback"| Pool
     Pool --> PG
-    PGB1 & PGB2 --> PG
+    PGB1 --> PG
+    PGB2 --> PG
 ```
 
 ### 8.2 k6 Scenario A: Pool Saturation & Burst Stress (1,500 VUs)
