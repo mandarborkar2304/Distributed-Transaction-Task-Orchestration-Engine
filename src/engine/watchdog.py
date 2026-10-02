@@ -30,6 +30,9 @@ class Watchdog:
             tasks = result.scalars().all()
             
             for task in tasks:
+                from src.observability.metrics import reclaimed_orphans
+                reclaimed_orphans.inc()
+                
                 if task.retry_count + 1 >= task.max_retries:
                     task.status = TaskStatus.DEAD_LETTER
                     task.last_error = 'Watchdog: Heartbeat expired, max retries exceeded'

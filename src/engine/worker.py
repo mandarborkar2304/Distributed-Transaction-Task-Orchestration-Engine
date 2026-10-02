@@ -91,6 +91,10 @@ class Worker:
                 success = False
                 error_msg = None
                 
+                from src.observability.metrics import tasks_total, execution_duration
+                import time
+                start_time = time.time()
+                
                 if handler:
                     try:
                         await handler.execute(task, task.payload)
@@ -100,6 +104,9 @@ class Worker:
                 else:
                     error_msg = f"Unknown handler: {task.handler_name}"
                     
+                duration = time.time() - start_time
+                execution_duration.labels(handler=task.handler_name).observe(duration)
+                    
                 if success:
                     task.status = TaskStatus.COMPLETED
                     task.locked_by = None
@@ -107,6 +114,8 @@ class Worker:
                     
                     if task.job:
                         task.job.status = TaskStatus.COMPLETED
+                        
+                    tasks_total.labels(status="COMPLETED", handler=task.handler_name).inc()
                 else:
                     if task.retry_count + 1 >= task.max_retries:
                         task.status = TaskStatus.DEAD_LETTER
@@ -116,7 +125,11 @@ class Worker:
                         
                         if task.job:
                             task.job.status = TaskStatus.FAILED
+                            
+                        tasks_total.labels(status="DEAD_LETTER", handler=task.handler_name).inc()
                     else:
+                        tasks_total.labels(status="FAILED", handler=task.handler_name).inc()
+                        
                         # Compute backoff and sleep before reverting to PENDING
                         backoff = self.get_backoff(task.retry_count)
                         task.last_error = error_msg

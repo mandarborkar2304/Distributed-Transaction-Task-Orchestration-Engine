@@ -37,6 +37,8 @@ async def create_job(
     try:
         cached_val = await redis_client.get(redis_key)
         if cached_val:
+            from src.observability.metrics import idempotency_hits
+            idempotency_hits.inc()
             data = json.loads(cached_val)
             return JobResponse(job_id=data["job_id"], status=data["status"], cached=True)
     except Exception:
