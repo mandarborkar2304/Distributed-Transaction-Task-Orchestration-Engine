@@ -54,6 +54,18 @@ jobs:
       - name: Install dependencies
         run: pip install -r requirements.txt
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/gateway/go.mod
+          cache-dependency-path: services/gateway/go.sum
+
+      - name: Pre-build Go binaries for polyglot chaos tests
+        run: |
+          go build -o /tmp/gateway-bin ./cmd/gateway/
+          go build -o /tmp/worker-bin ./cmd/worker/
+        working-directory: services/gateway
+
       - name: Run test suite
         run: pytest tests/ -v
 
@@ -173,6 +185,9 @@ jobs:
           asyncio.run(init())
           EOF
         working-directory: ../../
+
+      - name: Run native Go unit and integration tests with race detector
+        run: go test -v -race -count=1 ./...
 
       - name: Build gateway binary
         run: go build -o /tmp/gateway ./cmd/gateway/

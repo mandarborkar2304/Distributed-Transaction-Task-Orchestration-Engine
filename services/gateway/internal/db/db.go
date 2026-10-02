@@ -49,6 +49,22 @@ func (p *Pool) Close() {
 	p.pool.Close()
 }
 
+// QueryRow wraps pgxpool.Pool.QueryRow.
+func (p *Pool) QueryRow(ctx context.Context, sql string, args ...any) pgx.Row {
+	return p.pool.QueryRow(ctx, sql, args...)
+}
+
+// Exec wraps pgxpool.Pool.Exec.
+func (p *Pool) Exec(ctx context.Context, sql string, args ...any) error {
+	_, err := p.pool.Exec(ctx, sql, args...)
+	return err
+}
+
+// RawPool returns the underlying *pgxpool.Pool.
+func (p *Pool) RawPool() *pgxpool.Pool {
+	return p.pool
+}
+
 // UpsertJob inserts a new job row using INSERT ... ON CONFLICT DO NOTHING RETURNING.
 // Returns (job, true, nil) when a new row was created.
 // Returns (job, false, nil) when the idempotency key already existed.
