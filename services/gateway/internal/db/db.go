@@ -5,6 +5,8 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"os"
+	"strconv"
 	"time"
 
 	"github.com/google/uuid"
@@ -19,7 +21,7 @@ type Pool struct {
 }
 
 // New creates and validates a pgxpool with tuned settings for 20M-scale throughput.
-// MaxConns: 150 — supports 2+ gateway replicas without exhausting postgres max_connections=500.
+// MaxConns: 150 (auto-capped by server max_connections).
 // MinConns: 25  — pre-warm connections to avoid cold-start latency spikes.
 // MaxConnLifetime: 30m — recycle connections before postgres idle timeout.
 // MaxConnIdleTime: 5m  — return idle connections to OS promptly.
@@ -29,10 +31,32 @@ func New(ctx context.Context, dsn string) (*Pool, error) {
 		return nil, fmt.Errorf("pgxpool.ParseConfig: %w", err)
 	}
 	cfg.MaxConns = 150
+	if v := os.Getenv("PGPOOL_MAX_CONNS"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			cfg.MaxConns = int32(n)
+		}
+	}
 	cfg.MinConns = 25
 	cfg.MaxConnLifetime = 30 * time.Minute
 	cfg.MaxConnIdleTime = 5 * time.Minute
 	cfg.HealthCheckPeriod = 60 * time.Second
+
+	// Ensure MaxConns never exceeds PostgreSQL's actual max_connections (minus headroom)
+	singleConn, err := pgx.Connect(ctx, dsn)
+	if err == nil {
+		var pgMaxConns int
+		row := singleConn.QueryRow(ctx, "SHOW max_connections")
+		if scanErr := row.Scan(&pgMaxConns); scanErr == nil && pgMaxConns > 0 {
+			safeLimit := int32(pgMaxConns - 15) // reserve 15 for superuser/watchdog/other clients
+			if safeLimit > 0 && cfg.MaxConns > safeLimit {
+				cfg.MaxConns = safeLimit
+			}
+			if cfg.MinConns > cfg.MaxConns {
+				cfg.MinConns = cfg.MaxConns / 2
+			}
+		}
+		_ = singleConn.Close(ctx)
+	}
 
 	pool, err := pgxpool.NewWithConfig(ctx, cfg)
 	if err != nil {
@@ -120,13 +144,19 @@ func (p *Pool) UpsertJob(ctx context.Context, key, jobType, handlerName string, 
 
 // fetchJobByKey is used on idempotency conflict to return the existing job record.
 func (p *Pool) fetchJobByKey(ctx context.Context, key string) (model.Job, error) {
-	row := p.pool.QueryRow(ctx,
-		`SELECT id, idempotency_key, job_type, status, created_at FROM jobs WHERE idempotency_key = $1`, key)
 	var job model.Job
-	if err := row.Scan(&job.ID, &job.IdempotencyKey, &job.JobType, &job.Status, &job.CreatedAt); err != nil {
-		return model.Job{}, fmt.Errorf("fetchJobByKey: %w", err)
+	var lastErr error
+	for attempt := 0; attempt < 5; attempt++ {
+		row := p.pool.QueryRow(ctx,
+			`SELECT id, idempotency_key, job_type, status, created_at FROM jobs WHERE idempotency_key = $1`, key)
+		if err := row.Scan(&job.ID, &job.IdempotencyKey, &job.JobType, &job.Status, &job.CreatedAt); err == nil {
+			return job, nil
+		} else {
+			lastErr = err
+		}
+		time.Sleep(10 * time.Millisecond)
 	}
-	return job, nil
+	return model.Job{}, fmt.Errorf("fetchJobByKey: %w", lastErr)
 }
 
 // ClaimPendingTasks claims up to batchSize PENDING tasks using SELECT FOR UPDATE SKIP LOCKED.

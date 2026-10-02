@@ -62,7 +62,7 @@ func NewHandler(pool *db.Pool, rc *cache.Client, logger *slog.Logger) http.Handl
 			if logger != nil {
 				logger.Error("UpsertJob failed", "key", idempKey, "err", err)
 			}
-			writeJSON(w, http.StatusInternalServerError, map[string]string{"detail": "internal error"})
+			writeJSON(w, http.StatusInternalServerError, map[string]string{"detail": err.Error()})
 			metrics.RequestsTotal.WithLabelValues("POST", "500").Inc()
 			metrics.DBOperationsTotal.WithLabelValues("upsert_job", "error").Inc()
 			return
