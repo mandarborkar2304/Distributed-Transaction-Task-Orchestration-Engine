@@ -1,0 +1,191 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+     execution: local
+        script: scripts/benchmarks/k6_hardened.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 500 max VUs, 1m20s max duration (incl. graceful stop):
+              * payload_edge_cases: Up to 500 looping VUs for 50s over 3 stages (gracefulRampDown: 30s, exec: payloadEdgeCases, gracefulStop: 30s)
+
+
+running (0m00.8s), 025/500 VUs, 175 complete and 0 interrupted iterations
+payload_edge_cases   [   2% ] 025/500 VUs  00.8s/50.0s
+
+running (0m01.8s), 058/500 VUs, 475 complete and 0 interrupted iterations
+payload_edge_cases   [   4% ] 058/500 VUs  01.8s/50.0s
+
+running (0m02.8s), 092/500 VUs, 806 complete and 0 interrupted iterations
+payload_edge_cases   [   6% ] 092/500 VUs  02.8s/50.0s
+
+running (0m03.8s), 125/500 VUs, 1226 complete and 0 interrupted iterations
+payload_edge_cases   [   8% ] 125/500 VUs  03.8s/50.0s
+
+running (0m04.8s), 156/500 VUs, 1535 complete and 0 interrupted iterations
+payload_edge_cases   [  10% ] 156/500 VUs  04.8s/50.0s
+
+running (0m05.8s), 189/500 VUs, 1838 complete and 0 interrupted iterations
+payload_edge_cases   [  12% ] 189/500 VUs  05.8s/50.0s
+
+running (0m06.8s), 218/500 VUs, 2195 complete and 0 interrupted iterations
+payload_edge_cases   [  14% ] 218/500 VUs  06.8s/50.0s
+
+running (0m07.8s), 258/500 VUs, 2550 complete and 0 interrupted iterations
+payload_edge_cases   [  16% ] 258/500 VUs  07.8s/50.0s
+
+running (0m08.8s), 292/500 VUs, 2948 complete and 0 interrupted iterations
+payload_edge_cases   [  18% ] 292/500 VUs  08.8s/50.0s
+
+running (0m09.8s), 325/500 VUs, 3237 complete and 0 interrupted iterations
+payload_edge_cases   [  20% ] 325/500 VUs  09.8s/50.0s
+
+running (0m10.8s), 358/500 VUs, 3483 complete and 0 interrupted iterations
+payload_edge_cases   [  22% ] 358/500 VUs  10.8s/50.0s
+
+running (0m11.8s), 390/500 VUs, 3970 complete and 0 interrupted iterations
+payload_edge_cases   [  24% ] 390/500 VUs  11.8s/50.0s
+
+running (0m12.8s), 423/500 VUs, 4253 complete and 0 interrupted iterations
+payload_edge_cases   [  26% ] 423/500 VUs  12.8s/50.0s
+
+running (0m13.8s), 458/500 VUs, 4559 complete and 0 interrupted iterations
+payload_edge_cases   [  28% ] 458/500 VUs  13.8s/50.0s
+
+running (0m14.8s), 492/500 VUs, 4858 complete and 0 interrupted iterations
+payload_edge_cases   [  30% ] 492/500 VUs  14.8s/50.0s
+
+running (0m15.8s), 500/500 VUs, 5272 complete and 0 interrupted iterations
+payload_edge_cases   [  32% ] 500/500 VUs  15.8s/50.0s
+
+running (0m16.9s), 500/500 VUs, 5736 complete and 0 interrupted iterations
+payload_edge_cases   [  34% ] 500/500 VUs  16.9s/50.0s
+
+running (0m17.8s), 500/500 VUs, 5944 complete and 0 interrupted iterations
+payload_edge_cases   [  36% ] 500/500 VUs  17.8s/50.0s
+
+running (0m18.8s), 500/500 VUs, 6429 complete and 0 interrupted iterations
+payload_edge_cases   [  38% ] 500/500 VUs  18.8s/50.0s
+
+running (0m20.0s), 500/500 VUs, 6752 complete and 0 interrupted iterations
+payload_edge_cases   [  40% ] 500/500 VUs  20.0s/50.0s
+
+running (0m20.8s), 500/500 VUs, 7055 complete and 0 interrupted iterations
+payload_edge_cases   [  42% ] 500/500 VUs  20.8s/50.0s
+
+running (0m21.8s), 500/500 VUs, 7407 complete and 0 interrupted iterations
+payload_edge_cases   [  44% ] 500/500 VUs  21.8s/50.0s
+
+running (0m22.8s), 500/500 VUs, 7852 complete and 0 interrupted iterations
+payload_edge_cases   [  46% ] 500/500 VUs  22.8s/50.0s
+
+running (0m23.8s), 500/500 VUs, 8256 complete and 0 interrupted iterations
+payload_edge_cases   [  48% ] 500/500 VUs  23.8s/50.0s
+
+running (0m24.8s), 500/500 VUs, 8707 complete and 0 interrupted iterations
+payload_edge_cases   [  50% ] 500/500 VUs  24.8s/50.0s
+
+running (0m25.8s), 500/500 VUs, 9015 complete and 0 interrupted iterations
+payload_edge_cases   [  52% ] 500/500 VUs  25.8s/50.0s
+
+running (0m26.8s), 500/500 VUs, 9345 complete and 0 interrupted iterations
+payload_edge_cases   [  54% ] 500/500 VUs  26.8s/50.0s
+
+running (0m27.8s), 500/500 VUs, 9736 complete and 0 interrupted iterations
+payload_edge_cases   [  56% ] 500/500 VUs  27.8s/50.0s
+
+running (0m28.8s), 500/500 VUs, 10180 complete and 0 interrupted iterations
+payload_edge_cases   [  58% ] 500/500 VUs  28.8s/50.0s
+
+running (0m29.8s), 500/500 VUs, 10513 complete and 0 interrupted iterations
+payload_edge_cases   [  60% ] 500/500 VUs  29.8s/50.0s
+
+running (0m30.8s), 500/500 VUs, 10816 complete and 0 interrupted iterations
+payload_edge_cases   [  62% ] 500/500 VUs  30.8s/50.0s
+
+running (0m31.8s), 500/500 VUs, 11062 complete and 0 interrupted iterations
+payload_edge_cases   [  64% ] 500/500 VUs  31.8s/50.0s
+
+running (0m32.8s), 500/500 VUs, 11487 complete and 0 interrupted iterations
+payload_edge_cases   [  66% ] 500/500 VUs  32.8s/50.0s
+
+running (0m34.0s), 500/500 VUs, 11987 complete and 0 interrupted iterations
+payload_edge_cases   [  68% ] 500/500 VUs  34.0s/50.0s
+
+running (0m34.8s), 500/500 VUs, 12290 complete and 0 interrupted iterations
+payload_edge_cases   [  70% ] 500/500 VUs  34.8s/50.0s
+
+running (0m35.8s), 500/500 VUs, 12718 complete and 0 interrupted iterations
+payload_edge_cases   [  72% ] 500/500 VUs  35.8s/50.0s
+
+running (0m36.8s), 500/500 VUs, 13099 complete and 0 interrupted iterations
+payload_edge_cases   [  74% ] 500/500 VUs  36.8s/50.0s
+
+running (0m37.8s), 500/500 VUs, 13489 complete and 0 interrupted iterations
+payload_edge_cases   [  76% ] 500/500 VUs  37.8s/50.0s
+
+running (0m39.2s), 500/500 VUs, 13989 complete and 0 interrupted iterations
+payload_edge_cases   [  78% ] 500/500 VUs  39.2s/50.0s
+
+running (0m39.8s), 500/500 VUs, 14241 complete and 0 interrupted iterations
+payload_edge_cases   [  80% ] 500/500 VUs  39.8s/50.0s
+
+running (0m40.8s), 500/500 VUs, 14620 complete and 0 interrupted iterations
+payload_edge_cases   [  82% ] 500/500 VUs  40.8s/50.0s
+
+running (0m41.8s), 500/500 VUs, 15010 complete and 0 interrupted iterations
+payload_edge_cases   [  84% ] 500/500 VUs  41.8s/50.0s
+
+running (0m42.8s), 500/500 VUs, 15306 complete and 0 interrupted iterations
+payload_edge_cases   [  86% ] 500/500 VUs  42.8s/50.0s
+
+running (0m43.8s), 500/500 VUs, 15686 complete and 0 interrupted iterations
+payload_edge_cases   [  88% ] 500/500 VUs  43.8s/50.0s
+
+running (0m44.8s), 500/500 VUs, 16090 complete and 0 interrupted iterations
+payload_edge_cases   [  90% ] 500/500 VUs  44.8s/50.0s
+
+running (0m45.8s), 481/500 VUs, 16419 complete and 0 interrupted iterations
+payload_edge_cases   [  92% ] 481/500 VUs  45.8s/50.0s
+
+running (0m46.8s), 372/500 VUs, 16926 complete and 0 interrupted iterations
+payload_edge_cases   [  94% ] 372/500 VUs  46.8s/50.0s
+
+running (0m47.8s), 267/500 VUs, 17394 complete and 0 interrupted iterations
+payload_edge_cases   [  96% ] 267/500 VUs  47.8s/50.0s
+
+running (0m48.8s), 153/500 VUs, 17789 complete and 0 interrupted iterations
+payload_edge_cases   [  98% ] 153/500 VUs  48.8s/50.0s
+
+running (0m49.8s), 031/500 VUs, 18125 complete and 0 interrupted iterations
+payload_edge_cases   [ 100% ] 031/500 VUs  49.8s/50.0s
+
+     data_received.........................: 3.6 MB 72 kB/s
+     data_sent.............................: 480 MB 9.6 MB/s
+     http_202_accepted_total...............: 18014  360.209986/s
+     http_4xx_client_err_total.............: 193    3.85925/s
+     http_req_blocked......................: avg=8.81ms   min=1.74µs  med=5.15µs   max=1.4s  p(50)=5.15µs   p(90)=8.12µs   p(95)=33.13µs  p(99)=309.67ms p(99.9)=962.74ms
+     http_req_connecting...................: avg=8.14ms   min=0s      med=0s       max=1.19s p(50)=0s       p(90)=0s       p(95)=0s       p(99)=280.44ms p(99.9)=936.65ms
+     http_req_duration.....................: avg=828.96ms min=2.71ms  med=826.01ms max=3.78s p(50)=826.01ms p(90)=1.37s    p(95)=1.62s    p(99)=2.1s     p(99.9)=2.79s   
+       { expected_response:true }..........: avg=830.76ms min=2.71ms  med=827.55ms max=3.78s p(50)=827.55ms p(90)=1.37s    p(95)=1.62s    p(99)=2.1s     p(99.9)=2.79s   
+     ✓ { scenario:scenario_b_collision }...: avg=0s       min=0s      med=0s       max=0s    p(50)=0s       p(90)=0s       p(95)=0s       p(99)=0s       p(99.9)=0s      
+   ✓ http_req_failed.......................: 1.06%  193 out of 18207
+     http_req_receiving....................: avg=93.7ms   min=14.08µs med=28.67µs  max=2.08s p(50)=28.67µs  p(90)=339.94ms p(95)=751.51ms p(99)=1.49s    p(99.9)=1.98s   
+     http_req_sending......................: avg=45.23ms  min=8.84µs  med=93.86µs  max=2.12s p(50)=93.86µs  p(90)=150.47ms p(95)=297.29ms p(99)=697.31ms p(99.9)=1.56s   
+     http_req_tls_handshaking..............: avg=0s       min=0s      med=0s       max=0s    p(50)=0s       p(90)=0s       p(95)=0s       p(99)=0s       p(99.9)=0s      
+     http_req_waiting......................: avg=690.02ms min=0s      med=741.36ms max=2.42s p(50)=741.36ms p(90)=1.12s    p(95)=1.25s    p(99)=1.41s    p(99.9)=1.62s   
+     http_reqs.............................: 18207  364.069236/s
+     idempotency_cache_hit_rate............: 0.00%  0 out of 18014
+     idempotency_cache_misses_total........: 18014  360.209986/s
+     iteration_duration....................: avg=1.09s    min=3.02ms  med=1.09s    max=4.4s  p(50)=1.09s    p(90)=1.79s    p(95)=2.12s    p(99)=2.69s    p(99.9)=3.55s   
+     iterations............................: 18207  364.069236/s
+     job_latency_ms........................: avg=857.85ms min=3ms     med=839ms    max=4.29s p(50)=839ms    p(90)=1.44s    p(95)=1.72s    p(99)=2.17s    p(99.9)=3.02s   
+     vus...................................: 31     min=25           max=500
+     vus_max...............................: 500    min=500          max=500
+
+
+running (0m50.0s), 000/500 VUs, 18207 complete and 0 interrupted iterations
+payload_edge_cases ✓ [ 100% ] 000/500 VUs  50s

@@ -1,0 +1,142 @@
+{
+  "benchmark_metadata": {
+    "suite": "Hardened k6 & pgbench Concurrency, Saturation & Fault-Injection Battery",
+    "timestamp_utc": "2026-10-02T13:00:30Z",
+    "environment": {
+      "os": "Ubuntu 24.04.5 LTS (Linux x86_64)",
+      "vcpus": 2,
+      "ram_gb": 8,
+      "storage": "NVMe Codespaces Daemon",
+      "postgres_version": "16.15-Alpine (max_connections=500)",
+      "redis_version": "7.2.1-Alpine",
+      "go_runtime": "go1.27.1",
+      "gateway_pool": {
+        "max_conns": 150,
+        "min_conns": 25,
+        "max_conn_lifetime_min": 30,
+        "max_conn_idle_time_min": 5
+      }
+    }
+  },
+  "scenarios": {
+    "k6_scenario_a_pool_saturation": {
+      "name": "Pool Saturation & Burst Stress (1500 VUs)",
+      "vus_peak": 1500,
+      "duration_sec": 100,
+      "total_requests": 64690,
+      "throughput_rps": 646.82,
+      "http_status_codes": {
+        "202_accepted": 64690,
+        "4xx_client_err": 0,
+        "5xx_server_err": 0
+      },
+      "success_rate_percent": 100.0,
+      "error_rate_percent": 0.0,
+      "cache_hits": 0,
+      "cache_misses": 64690,
+      "latency_percentiles_ms": {
+        "p50": 1970.0,
+        "p90": 2640.0,
+        "p95": 2940.0,
+        "p99": 3350.0,
+        "p99_9": 3660.0,
+        "max": 4490.0
+      },
+      "observations": "1,500 VUs actively contended for 150 pgxpool connections. Ingestion requests queued in memory without connection dropouts. Zero 5xx errors; max latency capped at 4.49s, within the 5.0s per-request context timeout."
+    },
+    "k6_scenario_b_collision_chaos": {
+      "name": "Aggressive Collision Storm (1000 VUs, 20 Hot Keys) + 3s Redis Fault Injection",
+      "vus_peak": 1000,
+      "duration_sec": 60,
+      "total_requests": 153148,
+      "throughput_rps": 2552.32,
+      "http_status_codes": {
+        "202_accepted": 153148,
+        "4xx_client_err": 0,
+        "5xx_server_err": 0
+      },
+      "success_rate_percent": 100.0,
+      "error_rate_percent": 0.0,
+      "cache_hits": 150079,
+      "cache_hit_rate_percent": 97.99,
+      "cache_misses": 3069,
+      "latency_percentiles_ms": {
+        "p50": 259.77,
+        "p90": 437.27,
+        "p95": 511.45,
+        "p99": 694.90,
+        "p99_9": 4810.0,
+        "max": 5130.0
+      },
+      "fault_injection": {
+        "target": "redis",
+        "action": "docker pause",
+        "duration_ms": 3424,
+        "gateway_degradation": "Graceful fallthrough to PostgreSQL ON CONFLICT outbox verification during pause. Sub-millisecond Redis fast-path resumed instantly upon unpause.",
+        "goroutines_before": 11,
+        "goroutines_after": 14,
+        "goroutines_idle": 10,
+        "rss_memory_mb_before": 164.5,
+        "rss_memory_mb_after": 82.5
+      }
+    },
+    "k6_scenario_c_payload_edge": {
+      "name": "Payload Edge Cases & Error Invariant Audit (500 VUs)",
+      "vus_peak": 500,
+      "duration_sec": 50,
+      "total_requests": 18207,
+      "throughput_rps": 364.07,
+      "data_sent_mb": 480.0,
+      "http_status_codes": {
+        "202_accepted": 18014,
+        "4xx_client_err": 193,
+        "5xx_server_err": 0
+      },
+      "client_error_rate_percent": 1.06,
+      "server_error_rate_percent": 0.0,
+      "latency_percentiles_ms": {
+        "p50": 826.01,
+        "p90": 1370.0,
+        "p95": 1620.0,
+        "p99": 2100.0,
+        "p99_9": 2790.0,
+        "max": 3780.0
+      },
+      "observations": "Dynamic payloads from 1 KB to 50 KB handled smoothly. 1% injected malformed JSON and missing Idempotency-Key headers returned structured 400 Bad Request responses without goroutine or socket leaks."
+    },
+    "pgbench_test_1_queue_contention": {
+      "name": "Aggressive Queue Worker Contention (SKIP LOCKED + UPDATE)",
+      "concurrent_clients": 100,
+      "threads": 4,
+      "duration_sec": 60,
+      "transactions_processed": 8496,
+      "failed_transactions": 0,
+      "tps": 142.66,
+      "latency_avg_ms": 690.48,
+      "statement_latencies_ms": {
+        "begin": 46.58,
+        "update_skip_locked": 91.60,
+        "commit": 552.08
+      },
+      "deadlocks": 0
+    },
+    "pgbench_test_2_outbox_saturation": {
+      "name": "Outbox Multi-Table Transaction Ingestion Saturation",
+      "concurrent_clients": 100,
+      "threads": 4,
+      "duration_sec": 60,
+      "transactions_processed": 2927,
+      "failed_transactions": 0,
+      "tps": 48.38,
+      "latency_avg_ms": 1990.18,
+      "deadlocks": 0
+    }
+  },
+  "database_integrity_audit": {
+    "total_jobs": 188700,
+    "unique_idempotency_keys": 188700,
+    "total_deadlocks": 0,
+    "total_conflicts": 0,
+    "integrity_status": "PASSED — Zero duplicate records, zero deadlocks across all high-concurrency benchmarks"
+  }
+}

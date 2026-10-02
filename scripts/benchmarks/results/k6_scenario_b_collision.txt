@@ -1,0 +1,221 @@
+
+         /\      Grafana   /‾‾/  
+    /\  /  \     |\  __   /  /   
+   /  \/    \    | |/ /  /   ‾‾\ 
+  /          \   |   (  |  (‾)  |
+ / __________ \  |_|\_\  \_____/ 
+
+     execution: local
+        script: /workspaces/Distributed-Transaction-Task-Orchestration-Engine/scripts/benchmarks/k6_hardened.js
+        output: -
+
+     scenarios: (100.00%) 1 scenario, 1000 max VUs, 1m30s max duration (incl. graceful stop):
+              * lock_cache_storm: Up to 1000 looping VUs for 1m0s over 3 stages (gracefulRampDown: 30s, exec: lockCacheStorm, gracefulStop: 30s)
+
+
+running (0m00.5s), 0054/1000 VUs, 1241 complete and 0 interrupted iterations
+lock_cache_storm   [   1% ] 0054/1000 VUs  0m00.5s/1m00.0s
+
+running (0m01.6s), 0153/1000 VUs, 3078 complete and 0 interrupted iterations
+lock_cache_storm   [   3% ] 0153/1000 VUs  0m01.6s/1m00.0s
+
+running (0m02.5s), 0253/1000 VUs, 5363 complete and 0 interrupted iterations
+lock_cache_storm   [   4% ] 0253/1000 VUs  0m02.5s/1m00.0s
+
+running (0m03.6s), 0355/1000 VUs, 8429 complete and 0 interrupted iterations
+lock_cache_storm   [   6% ] 0355/1000 VUs  0m03.6s/1m00.0s
+
+running (0m04.6s), 0455/1000 VUs, 11831 complete and 0 interrupted iterations
+lock_cache_storm   [   8% ] 0455/1000 VUs  0m04.6s/1m00.0s
+
+running (0m05.6s), 0559/1000 VUs, 14247 complete and 0 interrupted iterations
+lock_cache_storm   [   9% ] 0559/1000 VUs  0m05.6s/1m00.0s
+
+running (0m06.5s), 0654/1000 VUs, 16554 complete and 0 interrupted iterations
+lock_cache_storm   [  11% ] 0654/1000 VUs  0m06.5s/1m00.0s
+
+running (0m07.5s), 0754/1000 VUs, 19729 complete and 0 interrupted iterations
+lock_cache_storm   [  13% ] 0754/1000 VUs  0m07.5s/1m00.0s
+
+running (0m08.5s), 0853/1000 VUs, 22287 complete and 0 interrupted iterations
+lock_cache_storm   [  14% ] 0853/1000 VUs  0m08.5s/1m00.0s
+
+running (0m09.6s), 0958/1000 VUs, 24784 complete and 0 interrupted iterations
+lock_cache_storm   [  16% ] 0958/1000 VUs  0m09.6s/1m00.0s
+
+running (0m10.5s), 1000/1000 VUs, 28362 complete and 0 interrupted iterations
+lock_cache_storm   [  18% ] 1000/1000 VUs  0m10.5s/1m00.0s
+
+running (0m11.6s), 1000/1000 VUs, 31336 complete and 0 interrupted iterations
+lock_cache_storm   [  19% ] 1000/1000 VUs  0m11.6s/1m00.0s
+
+running (0m12.5s), 1000/1000 VUs, 34520 complete and 0 interrupted iterations
+lock_cache_storm   [  21% ] 1000/1000 VUs  0m12.5s/1m00.0s
+
+running (0m13.6s), 1000/1000 VUs, 36842 complete and 0 interrupted iterations
+lock_cache_storm   [  23% ] 1000/1000 VUs  0m13.6s/1m00.0s
+
+running (0m14.6s), 1000/1000 VUs, 40057 complete and 0 interrupted iterations
+lock_cache_storm   [  24% ] 1000/1000 VUs  0m14.6s/1m00.0s
+
+running (0m15.6s), 1000/1000 VUs, 43570 complete and 0 interrupted iterations
+lock_cache_storm   [  26% ] 1000/1000 VUs  0m15.6s/1m00.0s
+
+running (0m16.5s), 1000/1000 VUs, 45366 complete and 0 interrupted iterations
+lock_cache_storm   [  28% ] 1000/1000 VUs  0m16.5s/1m00.0s
+
+running (0m17.6s), 1000/1000 VUs, 48094 complete and 0 interrupted iterations
+lock_cache_storm   [  29% ] 1000/1000 VUs  0m17.6s/1m00.0s
+
+running (0m18.5s), 1000/1000 VUs, 50849 complete and 0 interrupted iterations
+lock_cache_storm   [  31% ] 1000/1000 VUs  0m18.5s/1m00.0s
+
+running (0m19.6s), 1000/1000 VUs, 54152 complete and 0 interrupted iterations
+lock_cache_storm   [  33% ] 1000/1000 VUs  0m19.6s/1m00.0s
+
+running (0m20.5s), 1000/1000 VUs, 55829 complete and 0 interrupted iterations
+lock_cache_storm   [  34% ] 1000/1000 VUs  0m20.5s/1m00.0s
+
+running (0m21.5s), 1000/1000 VUs, 55829 complete and 0 interrupted iterations
+lock_cache_storm   [  36% ] 1000/1000 VUs  0m21.5s/1m00.0s
+
+running (0m22.5s), 1000/1000 VUs, 55829 complete and 0 interrupted iterations
+lock_cache_storm   [  38% ] 1000/1000 VUs  0m22.5s/1m00.0s
+
+running (0m23.5s), 1000/1000 VUs, 55831 complete and 0 interrupted iterations
+lock_cache_storm   [  39% ] 1000/1000 VUs  0m23.5s/1m00.0s
+
+running (0m24.5s), 1000/1000 VUs, 56308 complete and 0 interrupted iterations
+lock_cache_storm   [  41% ] 1000/1000 VUs  0m24.5s/1m00.0s
+
+running (0m25.6s), 1000/1000 VUs, 58241 complete and 0 interrupted iterations
+lock_cache_storm   [  43% ] 1000/1000 VUs  0m25.6s/1m00.0s
+
+running (0m26.6s), 1000/1000 VUs, 60870 complete and 0 interrupted iterations
+lock_cache_storm   [  44% ] 1000/1000 VUs  0m26.6s/1m00.0s
+
+running (0m27.5s), 1000/1000 VUs, 64404 complete and 0 interrupted iterations
+lock_cache_storm   [  46% ] 1000/1000 VUs  0m27.5s/1m00.0s
+
+running (0m28.5s), 1000/1000 VUs, 66865 complete and 0 interrupted iterations
+lock_cache_storm   [  48% ] 1000/1000 VUs  0m28.5s/1m00.0s
+
+running (0m29.6s), 1000/1000 VUs, 70460 complete and 0 interrupted iterations
+lock_cache_storm   [  49% ] 1000/1000 VUs  0m29.6s/1m00.0s
+
+running (0m30.5s), 1000/1000 VUs, 72522 complete and 0 interrupted iterations
+lock_cache_storm   [  51% ] 1000/1000 VUs  0m30.5s/1m00.0s
+
+running (0m31.6s), 1000/1000 VUs, 75055 complete and 0 interrupted iterations
+lock_cache_storm   [  53% ] 1000/1000 VUs  0m31.6s/1m00.0s
+
+running (0m32.5s), 1000/1000 VUs, 77149 complete and 0 interrupted iterations
+lock_cache_storm   [  54% ] 1000/1000 VUs  0m32.5s/1m00.0s
+
+running (0m33.6s), 1000/1000 VUs, 80733 complete and 0 interrupted iterations
+lock_cache_storm   [  56% ] 1000/1000 VUs  0m33.6s/1m00.0s
+
+running (0m34.6s), 1000/1000 VUs, 83536 complete and 0 interrupted iterations
+lock_cache_storm   [  58% ] 1000/1000 VUs  0m34.6s/1m00.0s
+
+running (0m35.6s), 1000/1000 VUs, 86898 complete and 0 interrupted iterations
+lock_cache_storm   [  59% ] 1000/1000 VUs  0m35.6s/1m00.0s
+
+running (0m36.6s), 1000/1000 VUs, 89419 complete and 0 interrupted iterations
+lock_cache_storm   [  61% ] 1000/1000 VUs  0m36.6s/1m00.0s
+
+running (0m37.5s), 1000/1000 VUs, 91650 complete and 0 interrupted iterations
+lock_cache_storm   [  63% ] 1000/1000 VUs  0m37.5s/1m00.0s
+
+running (0m38.5s), 1000/1000 VUs, 94794 complete and 0 interrupted iterations
+lock_cache_storm   [  64% ] 1000/1000 VUs  0m38.5s/1m00.0s
+
+running (0m39.6s), 1000/1000 VUs, 97645 complete and 0 interrupted iterations
+lock_cache_storm   [  66% ] 1000/1000 VUs  0m39.6s/1m00.0s
+
+running (0m40.5s), 1000/1000 VUs, 100753 complete and 0 interrupted iterations
+lock_cache_storm   [  68% ] 1000/1000 VUs  0m40.5s/1m00.0s
+
+running (0m41.6s), 1000/1000 VUs, 103974 complete and 0 interrupted iterations
+lock_cache_storm   [  69% ] 1000/1000 VUs  0m41.6s/1m00.0s
+
+running (0m42.6s), 1000/1000 VUs, 107629 complete and 0 interrupted iterations
+lock_cache_storm   [  71% ] 1000/1000 VUs  0m42.6s/1m00.0s
+
+running (0m43.6s), 1000/1000 VUs, 110008 complete and 0 interrupted iterations
+lock_cache_storm   [  73% ] 1000/1000 VUs  0m43.6s/1m00.0s
+
+running (0m44.5s), 1000/1000 VUs, 112700 complete and 0 interrupted iterations
+lock_cache_storm   [  74% ] 1000/1000 VUs  0m44.5s/1m00.0s
+
+running (0m45.6s), 1000/1000 VUs, 116271 complete and 0 interrupted iterations
+lock_cache_storm   [  76% ] 1000/1000 VUs  0m45.6s/1m00.0s
+
+running (0m46.5s), 1000/1000 VUs, 119202 complete and 0 interrupted iterations
+lock_cache_storm   [  78% ] 1000/1000 VUs  0m46.5s/1m00.0s
+
+running (0m47.6s), 1000/1000 VUs, 122475 complete and 0 interrupted iterations
+lock_cache_storm   [  79% ] 1000/1000 VUs  0m47.6s/1m00.0s
+
+running (0m48.6s), 1000/1000 VUs, 124215 complete and 0 interrupted iterations
+lock_cache_storm   [  81% ] 1000/1000 VUs  0m48.6s/1m00.0s
+
+running (0m49.6s), 1000/1000 VUs, 126932 complete and 0 interrupted iterations
+lock_cache_storm   [  83% ] 1000/1000 VUs  0m49.6s/1m00.0s
+
+running (0m50.5s), 1000/1000 VUs, 129904 complete and 0 interrupted iterations
+lock_cache_storm   [  84% ] 1000/1000 VUs  0m50.5s/1m00.0s
+
+running (0m51.6s), 1000/1000 VUs, 132702 complete and 0 interrupted iterations
+lock_cache_storm   [  86% ] 1000/1000 VUs  0m51.6s/1m00.0s
+
+running (0m52.6s), 1000/1000 VUs, 135121 complete and 0 interrupted iterations
+lock_cache_storm   [  88% ] 1000/1000 VUs  0m52.6s/1m00.0s
+
+running (0m53.6s), 1000/1000 VUs, 137809 complete and 0 interrupted iterations
+lock_cache_storm   [  89% ] 1000/1000 VUs  0m53.6s/1m00.0s
+
+running (0m54.6s), 1000/1000 VUs, 140164 complete and 0 interrupted iterations
+lock_cache_storm   [  91% ] 1000/1000 VUs  0m54.6s/1m00.0s
+
+running (0m55.6s), 0918/1000 VUs, 142640 complete and 0 interrupted iterations
+lock_cache_storm   [  93% ] 0918/1000 VUs  0m55.6s/1m00.0s
+
+running (0m56.6s), 0721/1000 VUs, 145848 complete and 0 interrupted iterations
+lock_cache_storm   [  94% ] 0721/1000 VUs  0m56.6s/1m00.0s
+
+running (0m57.6s), 0519/1000 VUs, 147966 complete and 0 interrupted iterations
+lock_cache_storm   [  96% ] 0519/1000 VUs  0m57.6s/1m00.0s
+
+running (0m58.6s), 0298/1000 VUs, 150363 complete and 0 interrupted iterations
+lock_cache_storm   [  98% ] 0298/1000 VUs  0m58.6s/1m00.0s
+
+running (0m59.6s), 0098/1000 VUs, 152390 complete and 0 interrupted iterations
+lock_cache_storm   [  99% ] 0098/1000 VUs  0m59.6s/1m00.0s
+
+     data_received.........................: 30 MB  503 kB/s
+     data_sent.............................: 44 MB  732 kB/s
+     http_202_accepted_total...............: 153148 2552.323674/s
+     http_req_blocked......................: avg=973.91µs min=1.25µs   med=3.64µs   max=554.35ms p(50)=3.64µs   p(90)=5.14µs   p(95)=6.44µs   p(99)=322.86µs p(99.9)=249.71ms
+     http_req_connecting...................: avg=926.26µs min=0s       med=0s       max=521.37ms p(50)=0s       p(90)=0s       p(95)=0s       p(99)=0s       p(99.9)=238.12ms
+     http_req_duration.....................: avg=295.99ms min=356.29µs med=259.77ms max=5.13s    p(50)=259.77ms p(90)=437.27ms p(95)=511.45ms p(99)=694.9ms  p(99.9)=4.81s   
+       { expected_response:true }..........: avg=295.99ms min=356.29µs med=259.77ms max=5.13s    p(50)=259.77ms p(90)=437.27ms p(95)=511.45ms p(99)=694.9ms  p(99.9)=4.81s   
+     ✓ { scenario:scenario_b_collision }...: avg=0s       min=0s       med=0s       max=0s       p(50)=0s       p(90)=0s       p(95)=0s       p(99)=0s       p(99.9)=0s      
+   ✓ http_req_failed.......................: 0.00%  0 out of 153148
+     http_req_receiving....................: avg=3.04ms   min=7.69µs   med=22.93µs  max=486.2ms  p(50)=22.93µs  p(90)=280.14µs p(95)=21.92ms  p(99)=71.61ms  p(99.9)=154.55ms
+     http_req_sending......................: avg=9.3ms    min=5.06µs   med=14.23µs  max=518.33ms p(50)=14.23µs  p(90)=32.04ms  p(95)=44.87ms  p(99)=85.52ms  p(99.9)=243.42ms
+     http_req_tls_handshaking..............: avg=0s       min=0s       med=0s       max=0s       p(50)=0s       p(90)=0s       p(95)=0s       p(99)=0s       p(99.9)=0s      
+     http_req_waiting......................: avg=283.64ms min=325.03µs med=248.59ms max=5s       p(50)=248.59ms p(90)=415.26ms p(95)=486.54ms p(99)=663.55ms p(99.9)=4.8s    
+     http_reqs.............................: 153148 2552.323674/s
+     idempotency_cache_hit_rate............: 97.99% 150079 out of 153148
+     idempotency_cache_hits_total..........: 150079 2501.176539/s
+     idempotency_cache_misses_total........: 3069   51.147135/s
+     iteration_duration....................: avg=337.66ms min=5.58ms   med=296.38ms max=5.15s    p(50)=296.38ms p(90)=502.14ms p(95)=581.08ms p(99)=899.05ms p(99.9)=4.86s   
+     iterations............................: 153148 2552.323674/s
+     job_latency_ms........................: avg=308.68ms min=0s       med=270ms    max=5.13s    p(50)=270ms    p(90)=456ms    p(95)=538ms    p(99)=783ms    p(99.9)=4.81s   
+     vus...................................: 99     min=54               max=1000
+     vus_max...............................: 1000   min=1000             max=1000
+
+
+running (1m00.0s), 0000/1000 VUs, 153148 complete and 0 interrupted iterations
+lock_cache_storm ✓ [ 100% ] 0000/1000 VUs  1m0s
