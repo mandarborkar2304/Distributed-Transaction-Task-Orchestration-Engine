@@ -6,28 +6,30 @@
   <title>Distributed Transaction & Task Orchestration Engine — Architecture Observation & Simulation Console</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Geist+Mono:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
   <style>
     :root {
-      --bg: #090A0F;
-      --surface: #12151F;
-      --surface-elevated: #181C2B;
-      --surface-hover: #1E2336;
-      --border: #1E2333;
-      --border-focus: #384260;
+      --bg: #08090C;
+      --surface: #0E1015;
+      --surface-elevated: #13161F;
+      --surface-hover: #12151C;
+      --border: rgba(255, 255, 255, 0.07);
+      --border-hover: rgba(255, 255, 255, 0.14);
+      --border-focus: rgba(56, 189, 248, 0.4);
       --text: #F8FAFC;
       --text-muted: #94A3B8;
       --text-dim: #64748B;
-      --cyan: #00F2FE;
-      --cyan-glow: rgba(0, 242, 254, 0.25);
+      --slate-dark: #475569;
+      --cyan: #38BDF8;
+      --cyan-glow: rgba(56, 189, 248, 0.25);
       --purple: #A855F7;
       --purple-glow: rgba(168, 85, 247, 0.25);
-      --green: #10B981;
-      --green-glow: rgba(16, 185, 129, 0.25);
+      --emerald: #34D399;
+      --emerald-glow: rgba(52, 211, 153, 0.25);
       --amber: #F59E0B;
       --amber-glow: rgba(245, 158, 11, 0.25);
-      --red: #EF4444;
-      --red-glow: rgba(239, 68, 68, 0.25);
+      --rose: #F43F5E;
+      --rose-glow: rgba(244, 63, 94, 0.25);
       --blue: #3B82F6;
     }
 
@@ -36,28 +38,29 @@
       margin: 0;
       padding: 0;
       -webkit-font-smoothing: antialiased;
+      -moz-osx-font-smoothing: grayscale;
     }
 
     body {
       background-color: var(--bg);
       color: var(--text);
-      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      font-family: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       min-height: 100vh;
       overflow-x: hidden;
       display: flex;
       flex-direction: column;
+      position: relative;
     }
 
-    /* Ambient background grid & glow */
+    /* Ambient minimal top glow */
     body::before {
       content: '';
       position: fixed;
       top: 0;
       left: 0;
       right: 0;
-      height: 600px;
-      background: radial-gradient(circle 800px at 50% -200px, rgba(0, 242, 254, 0.08), transparent 70%),
-                  radial-gradient(circle 600px at 80% 100px, rgba(168, 85, 247, 0.05), transparent 70%);
+      height: 520px;
+      background: radial-gradient(circle 800px at 50% -120px, rgba(56, 189, 248, 0.045), transparent 70%);
       pointer-events: none;
       z-index: 0;
     }
@@ -67,10 +70,10 @@
       position: sticky;
       top: 0;
       z-index: 50;
-      background: rgba(9, 10, 15, 0.85);
+      background: rgba(8, 9, 12, 0.85);
       backdrop-filter: blur(16px);
       border-bottom: 1px solid var(--border);
-      padding: 14px 28px;
+      padding: 12px 28px;
       display: flex;
       align-items: center;
       justify-content: space-between;
@@ -79,123 +82,125 @@
     .brand {
       display: flex;
       align-items: center;
-      gap: 14px;
+      gap: 12px;
     }
 
     .brand-logo {
-      width: 32px;
-      height: 32px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, var(--cyan), var(--purple));
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: linear-gradient(135deg, #38BDF8, #A855F7);
       display: flex;
       align-items: center;
       justify-content: center;
-      box-shadow: 0 0 16px var(--cyan-glow);
+      box-shadow: 0 0 14px rgba(56, 189, 248, 0.25);
     }
 
     .brand-logo svg {
-      width: 18px;
-      height: 18px;
-      color: #000;
+      width: 15px;
+      height: 15px;
+      color: #08090C;
     }
 
     .brand-title {
-      font-size: 15px;
+      font-size: 14px;
       font-weight: 600;
-      letter-spacing: -0.02em;
+      letter-spacing: -0.015em;
       color: var(--text);
     }
 
     .brand-badge {
-      font-family: 'Geist Mono', monospace;
+      font-family: 'JetBrains Mono', monospace;
       font-size: 11px;
       font-weight: 500;
-      background: rgba(255, 255, 255, 0.06);
+      background: rgba(255, 255, 255, 0.04);
       border: 1px solid var(--border);
       padding: 2px 8px;
-      border-radius: 20px;
+      border-radius: 4px;
       color: var(--cyan);
+      letter-spacing: 0.04em;
     }
 
     .header-actions {
       display: flex;
       align-items: center;
-      gap: 16px;
+      gap: 14px;
     }
 
     .mode-switch {
       display: flex;
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 3px;
+      border-radius: 6px;
+      padding: 2px;
     }
 
     .mode-btn {
       background: transparent;
       border: none;
-      color: var(--text-muted);
+      color: var(--text-dim);
       font-size: 12px;
       font-weight: 500;
-      padding: 6px 14px;
-      border-radius: 6px;
+      padding: 5px 12px;
+      border-radius: 4px;
       cursor: pointer;
       transition: all 0.15s ease;
     }
 
     .mode-btn.active {
-      background: var(--surface-elevated);
+      background: #181C28;
       color: var(--text);
-      box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.4);
     }
 
     .cluster-status {
       display: flex;
       align-items: center;
-      gap: 8px;
-      padding: 6px 14px;
+      gap: 7px;
+      padding: 5px 12px;
       border-radius: 20px;
-      background: rgba(16, 185, 129, 0.1);
-      border: 1px solid rgba(16, 185, 129, 0.3);
-      font-size: 12px;
+      background: rgba(52, 211, 153, 0.08);
+      border: 1px solid rgba(52, 211, 153, 0.2);
+      font-size: 11px;
+      font-family: 'JetBrains Mono', monospace;
       font-weight: 500;
-      color: var(--green);
+      color: var(--emerald);
       transition: all 0.3s ease;
     }
 
     .cluster-status.amber {
-      background: rgba(245, 158, 11, 0.1);
-      border-color: rgba(245, 158, 11, 0.3);
+      background: rgba(245, 158, 11, 0.08);
+      border-color: rgba(245, 158, 11, 0.25);
       color: var(--amber);
     }
 
     .cluster-status.red {
-      background: rgba(239, 68, 68, 0.1);
-      border-color: rgba(239, 68, 68, 0.3);
-      color: var(--red);
+      background: rgba(244, 63, 94, 0.08);
+      border-color: rgba(244, 63, 94, 0.25);
+      color: var(--rose);
     }
 
     .status-dot {
-      width: 7px;
-      height: 7px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
       background: currentColor;
-      box-shadow: 0 0 10px currentColor;
-      animation: pulse 2s infinite ease-in-out;
+      box-shadow: 0 0 8px currentColor;
+      animation: pulse 2.2s infinite ease-in-out;
     }
 
     @keyframes pulse {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.4; transform: scale(0.85); }
+      50% { opacity: 0.35; transform: scale(0.85); }
     }
 
     /* Main Container */
     main {
       flex: 1;
-      padding: 24px 28px;
+      padding: 20px 28px;
       display: flex;
       flex-direction: column;
-      gap: 22px;
+      gap: 18px;
       max-width: 1720px;
       width: 100%;
       margin: 0 auto;
@@ -206,32 +211,23 @@
     .kpi-grid {
       display: grid;
       grid-template-columns: repeat(6, 1fr);
-      gap: 14px;
+      gap: 12px;
     }
 
     .kpi-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 12px;
-      padding: 16px 18px;
+      border-radius: 8px;
+      padding: 14px 16px;
       position: relative;
       overflow: hidden;
-      transition: border-color 0.2s, transform 0.2s;
+      transition: border-color 0.2s, background-color 0.2s, transform 0.15s ease;
     }
 
     .kpi-card:hover {
-      border-color: var(--border-focus);
+      border-color: var(--border-hover);
+      background-color: var(--surface-hover);
       transform: translateY(-1px);
-    }
-
-    .kpi-card::after {
-      content: '';
-      position: absolute;
-      top: 0;
-      left: 0;
-      right: 0;
-      height: 2px;
-      background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.1), transparent);
     }
 
     .kpi-label {
@@ -240,41 +236,52 @@
       color: var(--text-dim);
       text-transform: uppercase;
       letter-spacing: 0.05em;
-      margin-bottom: 8px;
+      margin-bottom: 6px;
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
 
+    .kpi-label span {
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 10px;
+      color: var(--slate-dark);
+    }
+
     .kpi-value {
-      font-family: 'Geist Mono', monospace;
-      font-size: 26px;
+      font-family: 'JetBrains Mono', monospace;
+      font-size: 24px;
       font-weight: 600;
       letter-spacing: -0.03em;
       color: var(--text);
     }
 
     .kpi-sub {
-      font-size: 12px;
+      font-size: 11px;
       color: var(--text-muted);
       margin-top: 4px;
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
     }
 
     .kpi-sub.cyan { color: var(--cyan); }
     .kpi-sub.purple { color: var(--purple); }
-    .kpi-sub.green { color: var(--green); }
+    .kpi-sub.green { color: var(--emerald); }
     .kpi-sub.amber { color: var(--amber); }
 
     /* Panel 2: Pipeline Canvas Visualizer */
     .canvas-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 18px;
+      border-radius: 10px;
+      padding: 16px 18px;
       position: relative;
+      transition: border-color 0.2s ease;
+    }
+
+    .canvas-card:hover {
+      border-color: var(--border-hover);
     }
 
     .canvas-header {
@@ -285,19 +292,30 @@
     }
 
     .card-title {
-      font-size: 14px;
+      font-size: 13px;
       font-weight: 600;
+      letter-spacing: -0.01em;
       display: flex;
       align-items: center;
       gap: 8px;
+      color: #E2E8F0;
+    }
+
+    .card-title-sub {
+      font-size: 11px;
+      font-weight: 400;
+      color: var(--text-dim);
+      margin-left: 6px;
+      font-family: 'Inter', sans-serif;
     }
 
     .canvas-legend {
       display: flex;
       align-items: center;
-      gap: 18px;
+      gap: 16px;
       font-size: 11px;
-      color: var(--text-muted);
+      color: var(--text-dim);
+      font-family: 'JetBrains Mono', monospace;
     }
 
     .legend-item {
@@ -307,17 +325,17 @@
     }
 
     .legend-dot {
-      width: 8px;
-      height: 8px;
+      width: 6px;
+      height: 6px;
       border-radius: 50%;
     }
 
     #pipelineCanvas {
       width: 100%;
       height: 380px;
-      border-radius: 10px;
-      background: #0B0E17;
-      border: 1px solid rgba(255, 255, 255, 0.04);
+      border-radius: 6px;
+      background: #090B10;
+      border: 1px solid rgba(255, 255, 255, 0.03);
       display: block;
     }
 
@@ -325,7 +343,7 @@
     .split-row {
       display: grid;
       grid-template-columns: 1.15fr 0.85fr;
-      gap: 20px;
+      gap: 16px;
     }
 
     /* Panel 3: Worker Matrix */
@@ -333,86 +351,108 @@
       display: grid;
       grid-template-columns: repeat(3, 1fr);
       gap: 12px;
-      margin-top: 14px;
+      margin-top: 12px;
     }
 
     .worker-node {
       background: var(--surface-elevated);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px;
+      border-radius: 8px;
+      padding: 13px 14px;
       position: relative;
-      transition: all 0.3s ease;
+      overflow: hidden;
+      transition: all 0.25s ease;
+    }
+
+    .worker-node:hover {
+      border-color: var(--border-hover);
+      background: #151824;
     }
 
     .worker-node.crashed {
-      border-color: rgba(239, 68, 68, 0.5);
-      background: rgba(239, 68, 68, 0.04);
+      border-color: rgba(244, 63, 94, 0.45);
+      background: rgba(244, 63, 94, 0.04);
     }
 
     .worker-top {
       display: flex;
       align-items: center;
       justify-content: space-between;
-      margin-bottom: 10px;
+      margin-bottom: 8px;
     }
 
     .worker-name {
-      font-size: 13px;
+      font-size: 12px;
       font-weight: 600;
+      font-family: 'JetBrains Mono', monospace;
+      color: #F1F5F9;
     }
 
     .worker-tag {
-      font-family: 'Geist Mono', monospace;
+      font-family: 'JetBrains Mono', monospace;
       font-size: 10px;
-      padding: 2px 6px;
-      border-radius: 4px;
+      padding: 1px 6px;
+      border-radius: 3px;
       background: rgba(255, 255, 255, 0.05);
-      color: var(--text-dim);
+      color: var(--emerald);
+      border: 1px solid rgba(52, 211, 153, 0.2);
+    }
+
+    .worker-node.crashed .worker-tag {
+      color: var(--rose);
+      border-color: rgba(244, 63, 94, 0.3);
+      background: rgba(244, 63, 94, 0.1);
     }
 
     .worker-metric-row {
       display: flex;
       justify-content: space-between;
       font-size: 11px;
-      color: var(--text-muted);
-      margin-bottom: 6px;
+      color: var(--text-dim);
+      margin-bottom: 4px;
+      font-family: 'Inter', sans-serif;
     }
 
-    .heartbeat-bar-container {
-      margin-top: 10px;
+    .worker-metric-row strong {
+      font-family: 'JetBrains Mono', monospace;
+      color: #CBD5E1;
+      font-weight: 500;
     }
 
-    .heartbeat-bar-header {
+    /* Minimalist 2px Bottom Heartbeat Strip */
+    .heartbeat-strip-track {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      height: 2px;
+      background: rgba(255, 255, 255, 0.05);
+    }
+
+    .heartbeat-strip-fill {
+      height: 100%;
+      width: 100%;
+      background: var(--emerald);
+      transition: width 0.1s linear, background-color 0.3s ease;
+    }
+
+    .worker-hb-inline {
+      margin-top: 8px;
       display: flex;
+      align-items: center;
       justify-content: space-between;
       font-size: 10px;
       color: var(--text-dim);
-      margin-bottom: 4px;
-      font-family: 'Geist Mono', monospace;
-    }
-
-    .heartbeat-track {
-      height: 4px;
-      background: rgba(255, 255, 255, 0.08);
-      border-radius: 2px;
-      overflow: hidden;
-    }
-
-    .heartbeat-fill {
-      height: 100%;
-      width: 100%;
-      background: var(--green);
-      transition: width 0.1s linear, background-color 0.3s ease;
+      font-family: 'JetBrains Mono', monospace;
     }
 
     /* Queue Depth Bar */
     .queue-depth-box {
-      margin-top: 16px;
+      margin-top: 14px;
       background: var(--surface-elevated);
       border: 1px solid var(--border);
-      border-radius: 10px;
-      padding: 14px;
+      border-radius: 8px;
+      padding: 12px 14px;
     }
 
     .queue-stats-row {
@@ -423,9 +463,9 @@
     }
 
     .queue-segmented-bar {
-      height: 8px;
-      border-radius: 4px;
-      background: #0B0E17;
+      height: 6px;
+      border-radius: 3px;
+      background: #090B10;
       display: flex;
       overflow: hidden;
       gap: 1px;
@@ -433,18 +473,23 @@
 
     .seg-pending { background: var(--cyan); width: 25%; transition: width 0.3s ease; }
     .seg-running { background: var(--blue); width: 35%; transition: width 0.3s ease; }
-    .seg-completed { background: var(--green); width: 38%; transition: width 0.3s ease; }
-    .seg-dlq { background: var(--red); width: 2%; transition: width 0.3s ease; }
+    .seg-completed { background: var(--emerald); width: 38%; transition: width 0.3s ease; }
+    .seg-dlq { background: var(--rose); width: 2%; transition: width 0.3s ease; }
 
     /* Panel 4: Interactive Simulation & Chaos Console */
     .chaos-panel {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 18px;
+      border-radius: 10px;
+      padding: 16px 18px;
       display: flex;
       flex-direction: column;
-      gap: 16px;
+      gap: 14px;
+      transition: border-color 0.2s ease;
+    }
+
+    .chaos-panel:hover {
+      border-color: var(--border-hover);
     }
 
     .control-group {
@@ -456,111 +501,146 @@
     .control-header {
       display: flex;
       justify-content: space-between;
-      font-size: 12px;
+      font-size: 11px;
       font-weight: 500;
       color: var(--text-muted);
     }
 
     .control-val {
-      font-family: 'Geist Mono', monospace;
+      font-family: 'JetBrains Mono', monospace;
       color: var(--cyan);
-      font-weight: 600;
+      font-weight: 500;
+      font-size: 11px;
     }
 
+    /* Modern Sleek Sliders */
     input[type=range] {
       -webkit-appearance: none;
+      appearance: none;
       width: 100%;
-      height: 6px;
-      background: #181C2B;
-      border-radius: 3px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.08);
+      border-radius: 2px;
       outline: none;
+      cursor: pointer;
     }
 
     input[type=range]::-webkit-slider-thumb {
       -webkit-appearance: none;
-      width: 16px;
-      height: 16px;
+      appearance: none;
+      width: 14px;
+      height: 14px;
       border-radius: 50%;
       background: var(--cyan);
+      box-shadow: 0 0 0 2px #0E1015, 0 0 8px var(--cyan-glow);
+      transition: transform 0.15s ease, background-color 0.15s ease;
       cursor: pointer;
-      box-shadow: 0 0 10px var(--cyan-glow);
-      transition: transform 0.1s;
     }
 
     input[type=range]::-webkit-slider-thumb:hover {
-      transform: scale(1.15);
+      transform: scale(1.18);
     }
 
+    input[type=range]::-moz-range-thumb {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      background: var(--cyan);
+      border: 2px solid #0E1015;
+      box-shadow: 0 0 8px var(--cyan-glow);
+      transition: transform 0.15s ease;
+      cursor: pointer;
+    }
+
+    input[type=range]::-moz-range-thumb:hover {
+      transform: scale(1.18);
+    }
+
+    /* Refined Action Buttons */
     .btn-grid {
       display: grid;
       grid-template-columns: 1fr 1fr;
-      gap: 10px;
-      margin-top: 6px;
+      gap: 8px;
+      margin-top: 4px;
     }
 
     .action-btn {
-      background: var(--surface-elevated);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      padding: 10px 12px;
-      font-size: 12px;
+      background: #141720;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+      border-radius: 7px;
+      padding: 9px 12px;
+      font-size: 11px;
       font-weight: 500;
-      color: var(--text);
+      color: #E2E8F0;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
       gap: 8px;
-      transition: all 0.2s;
+      transition: all 0.15s cubic-bezier(0.16, 1, 0.3, 1);
+      user-select: none;
     }
 
     .action-btn:hover {
-      background: var(--surface-hover);
-      border-color: var(--border-focus);
+      background: #1A1F2C;
+      border-color: rgba(255, 255, 255, 0.16);
+      transform: translateY(-1px);
+    }
+
+    .action-btn:active {
+      transform: scale(0.98);
     }
 
     .action-btn.danger {
-      border-color: rgba(239, 68, 68, 0.4);
-      background: rgba(239, 68, 68, 0.08);
-      color: #FCA5A5;
+      color: #FDA4AF;
+      border-color: rgba(244, 63, 94, 0.22);
+      background: rgba(244, 63, 94, 0.05);
     }
 
     .action-btn.danger:hover {
-      background: rgba(239, 68, 68, 0.18);
-      box-shadow: 0 0 14px var(--red-glow);
+      background: rgba(244, 63, 94, 0.12);
+      border-color: rgba(244, 63, 94, 0.45);
+      box-shadow: 0 0 12px rgba(244, 63, 94, 0.18);
     }
 
     .action-btn.warning {
-      border-color: rgba(245, 158, 11, 0.4);
-      background: rgba(245, 158, 11, 0.08);
       color: #FCD34D;
+      border-color: rgba(245, 158, 11, 0.22);
+      background: rgba(245, 158, 11, 0.05);
     }
 
     .action-btn.warning:hover {
-      background: rgba(245, 158, 11, 0.18);
-      box-shadow: 0 0 14px var(--amber-glow);
+      background: rgba(245, 158, 11, 0.12);
+      border-color: rgba(245, 158, 11, 0.45);
+      box-shadow: 0 0 12px rgba(245, 158, 11, 0.18);
     }
 
-    .action-btn.cyan-btn {
-      border-color: rgba(0, 242, 254, 0.4);
-      background: rgba(0, 242, 254, 0.08);
-      color: var(--cyan);
+    .action-btn.burst {
+      color: #38BDF8;
+      border-color: rgba(56, 189, 248, 0.22);
+      background: rgba(56, 189, 248, 0.05);
     }
 
-    .action-btn.cyan-btn:hover {
-      background: rgba(0, 242, 254, 0.18);
-      box-shadow: 0 0 14px var(--cyan-glow);
+    .action-btn.burst:hover {
+      background: rgba(56, 189, 248, 0.12);
+      border-color: rgba(56, 189, 248, 0.45);
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.18);
     }
 
     /* Panel 5: Telemetry Event Stream (Terminal Log Drawer) */
     .log-card {
       background: var(--surface);
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 16px 18px;
+      border-radius: 10px;
+      padding: 14px 18px;
       display: flex;
       flex-direction: column;
-      gap: 12px;
+      gap: 10px;
+      transition: border-color 0.2s ease;
+    }
+
+    .log-card:hover {
+      border-color: var(--border-hover);
     }
 
     .log-header {
@@ -571,47 +651,48 @@
 
     .log-filters {
       display: flex;
-      gap: 6px;
+      gap: 5px;
     }
 
     .filter-pill {
       background: transparent;
       border: 1px solid var(--border);
-      border-radius: 14px;
-      padding: 3px 10px;
-      font-size: 11px;
+      border-radius: 4px;
+      padding: 2px 8px;
+      font-size: 10px;
+      font-family: 'JetBrains Mono', monospace;
       color: var(--text-dim);
       cursor: pointer;
       transition: all 0.15s;
     }
 
     .filter-pill.active {
-      background: var(--surface-elevated);
+      background: #181C28;
       color: var(--text);
       border-color: var(--cyan);
     }
 
     .log-terminal {
-      background: #0B0D14;
+      background: #090B10;
       border: 1px solid rgba(255, 255, 255, 0.04);
-      border-radius: 8px;
+      border-radius: 6px;
       height: 180px;
       overflow-y: auto;
-      padding: 12px;
-      font-family: 'Geist Mono', monospace;
+      padding: 10px 12px;
+      font-family: 'JetBrains Mono', monospace;
       font-size: 11px;
       line-height: 1.6;
       display: flex;
       flex-direction: column;
-      gap: 3px;
+      gap: 2px;
     }
 
     .log-terminal::-webkit-scrollbar {
-      width: 6px;
+      width: 5px;
     }
     .log-terminal::-webkit-scrollbar-thumb {
-      background: var(--border);
-      border-radius: 3px;
+      background: rgba(255, 255, 255, 0.1);
+      border-radius: 2px;
     }
 
     .log-entry {
@@ -620,21 +701,33 @@
       word-break: break-all;
     }
 
-    .log-ts { color: var(--text-dim); }
-    .log-tag { font-weight: 600; padding: 0 4px; border-radius: 3px; }
-    .log-tag.claim { background: rgba(59, 130, 246, 0.15); color: #60A5FA; }
-    .log-tag.idemp { background: rgba(168, 85, 247, 0.15); color: #C084FC; }
-    .log-tag.outbox { background: rgba(0, 242, 254, 0.15); color: #38BDF8; }
-    .log-tag.reaper { background: rgba(245, 158, 11, 0.15); color: #FBBF24; }
-    .log-tag.dlq { background: rgba(239, 68, 68, 0.15); color: #F87171; }
-    .log-tag.hb { background: rgba(16, 185, 129, 0.15); color: #34D399; }
+    .log-ts { color: var(--slate-dark); flex-shrink: 0; }
+    .log-tag {
+      font-weight: 500;
+      font-size: 10px;
+      padding: 0 5px;
+      border-radius: 3px;
+      flex-shrink: 0;
+      height: 18px;
+      display: inline-flex;
+      align-items: center;
+    }
+
+    .log-tag.claim { background: rgba(59, 130, 246, 0.1); border: 1px solid rgba(59, 130, 246, 0.2); color: #93C5FD; }
+    .log-tag.idemp { background: rgba(168, 85, 247, 0.1); border: 1px solid rgba(168, 85, 247, 0.2); color: #C084FC; }
+    .log-tag.outbox { background: rgba(56, 189, 248, 0.1); border: 1px solid rgba(56, 189, 248, 0.2); color: #38BDF8; }
+    .log-tag.reaper { background: rgba(245, 158, 11, 0.1); border: 1px solid rgba(245, 158, 11, 0.2); color: #FCD34D; }
+    .log-tag.dlq { background: rgba(244, 63, 94, 0.1); border: 1px solid rgba(244, 63, 94, 0.2); color: #FDA4AF; }
+    .log-tag.hb { background: rgba(52, 211, 153, 0.1); border: 1px solid rgba(52, 211, 153, 0.2); color: #6EE7B7; }
     .log-msg { color: var(--text-muted); }
+    .log-uuid { color: var(--cyan); font-weight: 500; }
+    .log-stat { color: #F1F5F9; }
 
     /* Footer */
     footer {
       border-top: 1px solid var(--border);
-      padding: 16px 28px;
-      font-size: 12px;
+      padding: 14px 28px;
+      font-size: 11px;
       color: var(--text-dim);
       display: flex;
       justify-content: space-between;
@@ -644,6 +737,12 @@
     footer a {
       color: var(--cyan);
       text-decoration: none;
+      transition: color 0.15s;
+    }
+
+    footer a:hover {
+      color: #7DD3FC;
+      text-decoration: underline;
     }
 
     @media (max-width: 1200px) {
@@ -723,28 +822,29 @@
 
       <div class="kpi-card">
         <div class="kpi-label">pgxpool Conns <span>MAX 150</span></div>
-        <div class="kpi-value" id="kpiPoolConns">25 <span style="font-size: 14px; color: var(--text-dim)">/ 150</span></div>
+        <div class="kpi-value" id="kpiPoolConns">25 <span style="font-size: 13px; color: var(--text-dim)">/ 150</span></div>
         <div class="kpi-sub">Pre-warmed binary pool</div>
       </div>
     </section>
 
-    <!-- Panel 2: Dynamic Pipeline Visualizer -->
+    <!-- Panel 2: Dedicated System Pipeline Architecture & Dynamic Particle Stream -->
     <section class="canvas-card">
       <div class="canvas-header">
         <div class="card-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--cyan)" stroke-width="2">
             <rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect>
             <rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect>
             <line x1="6" y1="6" x2="6.01" y2="6"></line>
             <line x1="6" y1="18" x2="6.01" y2="18"></line>
           </svg>
-          Dynamic Pipeline Topology & Particle Stream
+          System Pipeline Architecture
+          <span class="card-title-sub">Real-time directed execution graph & transaction spline streams</span>
         </div>
         <div class="canvas-legend">
-          <div class="legend-item"><span class="legend-dot" style="background: var(--cyan)"></span> Transactional Outbox Write</div>
-          <div class="legend-item"><span class="legend-dot" style="background: var(--purple)"></span> Redis Fast-Path Hit</div>
-          <div class="legend-item"><span class="legend-dot" style="background: var(--amber)"></span> Watchdog Task Reclaimed</div>
-          <div class="legend-item"><span class="legend-dot" style="background: var(--red)"></span> Dead Letter Queue Drop</div>
+          <div class="legend-item"><span class="legend-dot" style="background: var(--cyan)"></span> Outbox Write</div>
+          <div class="legend-item"><span class="legend-dot" style="background: var(--purple)"></span> Fast-Path Cache Hit</div>
+          <div class="legend-item"><span class="legend-dot" style="background: var(--emerald)"></span> Task Completed</div>
+          <div class="legend-item"><span class="legend-dot" style="background: var(--rose)"></span> Poison / DLQ Drop</div>
         </div>
       </div>
       <canvas id="pipelineCanvas"></canvas>
@@ -753,10 +853,10 @@
     <!-- Split Section: Worker Matrix & Interactive Chaos Controller -->
     <div class="split-row">
 
-      <!-- Panel 3: Worker Matrix -->
+      <!-- Panel 3: Worker Pool Concurrency & Heartbeat Matrix -->
       <section class="canvas-card">
         <div class="card-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--emerald)" stroke-width="2">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
           </svg>
           Worker Pool Concurrency & Heartbeat Matrix
@@ -774,21 +874,19 @@
               <strong id="leasesWorker1">24 / 50</strong>
             </div>
             <div class="worker-metric-row">
-              <span>Memory Footprint:</span>
-              <span>14.8 MB RSS</span>
+              <span>Memory RSS:</span>
+              <span>14.8 MB</span>
             </div>
             <div class="worker-metric-row">
               <span>Lock Engine:</span>
               <span>Lua CAS</span>
             </div>
-            <div class="heartbeat-bar-container">
-              <div class="heartbeat-bar-header">
-                <span>HEARTBEAT TICK</span>
-                <span id="hbSecWorker1">8.4s</span>
-              </div>
-              <div class="heartbeat-track">
-                <div class="heartbeat-fill" id="hbFillWorker1"></div>
-              </div>
+            <div class="worker-hb-inline">
+              <span>HEARTBEAT TICK</span>
+              <span id="hbSecWorker1">8.4s</span>
+            </div>
+            <div class="heartbeat-strip-track">
+              <div class="heartbeat-strip-fill" id="hbFillWorker1"></div>
             </div>
           </div>
 
@@ -803,21 +901,19 @@
               <strong id="leasesWorker2">26 / 50</strong>
             </div>
             <div class="worker-metric-row">
-              <span>Memory Footprint:</span>
-              <span>15.2 MB RSS</span>
+              <span>Memory RSS:</span>
+              <span>15.2 MB</span>
             </div>
             <div class="worker-metric-row">
               <span>Lock Engine:</span>
               <span>Lua CAS</span>
             </div>
-            <div class="heartbeat-bar-container">
-              <div class="heartbeat-bar-header">
-                <span>HEARTBEAT TICK</span>
-                <span id="hbSecWorker2">6.2s</span>
-              </div>
-              <div class="heartbeat-track">
-                <div class="heartbeat-fill" id="hbFillWorker2"></div>
-              </div>
+            <div class="worker-hb-inline">
+              <span>HEARTBEAT TICK</span>
+              <span id="hbSecWorker2">6.2s</span>
+            </div>
+            <div class="heartbeat-strip-track">
+              <div class="heartbeat-strip-fill" id="hbFillWorker2"></div>
             </div>
           </div>
 
@@ -832,21 +928,19 @@
               <strong>10 / 10</strong>
             </div>
             <div class="worker-metric-row">
-              <span>Memory Footprint:</span>
-              <span>116.4 MB RSS</span>
+              <span>Memory RSS:</span>
+              <span>116.4 MB</span>
             </div>
             <div class="worker-metric-row">
               <span>Dispatch Mode:</span>
               <span>Asyncio gather</span>
             </div>
-            <div class="heartbeat-bar-container">
-              <div class="heartbeat-bar-header">
-                <span>HEARTBEAT TICK</span>
-                <span id="hbSecWorkerPy">4.1s</span>
-              </div>
-              <div class="heartbeat-track">
-                <div class="heartbeat-fill" id="hbFillWorkerPy"></div>
-              </div>
+            <div class="worker-hb-inline">
+              <span>HEARTBEAT TICK</span>
+              <span id="hbSecWorkerPy">4.1s</span>
+            </div>
+            <div class="heartbeat-strip-track">
+              <div class="heartbeat-strip-fill" id="hbFillWorkerPy"></div>
             </div>
           </div>
         </div>
@@ -855,11 +949,11 @@
         <div class="queue-depth-box">
           <div class="queue-stats-row">
             <span><strong>Total In-Flight Tasks:</strong> <span id="txtTotalTasks">5,420</span></span>
-            <span style="font-family: 'Geist Mono', monospace; color: var(--text-dim);">
+            <span style="font-family: 'JetBrains Mono', monospace; color: var(--text-dim); font-size: 10px;">
               <span style="color: var(--cyan)">●</span> PENDING: <span id="txtPending">1,240</span> &nbsp;
               <span style="color: var(--blue)">●</span> RUNNING: <span id="txtRunning">60</span> &nbsp;
-              <span style="color: var(--green)">●</span> COMPLETED: <span id="txtCompleted">4,108</span> &nbsp;
-              <span style="color: var(--red)">●</span> DLQ: <span id="txtDlq">12</span>
+              <span style="color: var(--emerald)">●</span> COMPLETED: <span id="txtCompleted">4,108</span> &nbsp;
+              <span style="color: var(--rose)">●</span> DLQ: <span id="txtDlq">12</span>
             </span>
           </div>
           <div class="queue-segmented-bar">
@@ -874,7 +968,7 @@
       <!-- Panel 4: Interactive Simulation & Chaos Controls -->
       <section class="chaos-panel">
         <div class="card-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--amber)" stroke-width="2">
             <path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"></path>
           </svg>
           Simulation & Chaos Fault Injection
@@ -898,22 +992,22 @@
 
         <div class="btn-grid">
           <button class="action-btn danger" id="btnCrashWorker">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"></circle><line x1="15" y1="9" x2="9" y2="15"></line><line x1="9" y1="9" x2="15" y2="15"></line></svg>
             Crash Go Worker 2 (SIGKILL)
           </button>
 
           <button class="action-btn warning" id="btnRedisFreeze">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="9" x2="15" y2="15"></line><line x1="15" y1="9" x2="9" y2="15"></line></svg>
             Freeze Redis (3.4s Chaos)
           </button>
 
           <button class="action-btn" id="btnInjectPoison">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--rose)" stroke-width="2"><path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"></path><line x1="12" y1="9" x2="12" y2="13"></line><line x1="12" y1="17" x2="12.01" y2="17"></line></svg>
             Inject Poison Pill Task
           </button>
 
-          <button class="action-btn cyan-btn" id="btnBurstStress">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
+          <button class="action-btn burst" id="btnBurstStress">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon></svg>
             Burst 1,500 VUs Saturation
           </button>
         </div>
@@ -925,7 +1019,7 @@
     <section class="log-card">
       <div class="log-header">
         <div class="card-title">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" stroke-width="2">
             <polyline points="4 17 10 11 4 5"></polyline>
             <line x1="12" y1="19" x2="20" y2="19"></line>
           </svg>
@@ -948,10 +1042,10 @@
   <!-- Footer -->
   <footer>
     <div>Distributed Task & Orchestration Engine &bull; Go Acceleration Gateway & PostgreSQL 16</div>
-    <div>Docs: <a href="/docs/ARCHITECTURE.md">System Architecture</a> &bull; <a href="/docs/BENCHMARK_RESULTS.md">Empirical Benchmark Data</a></div>
+    <div>Docs: <a href="https://github.com/mandarborkar2304/Distributed-Transaction-Task-Orchestration-Engine/blob/main/docs/ARCHITECTURE.md">System Architecture</a> &bull; <a href="https://github.com/mandarborkar2304/Distributed-Transaction-Task-Orchestration-Engine/blob/main/docs/BENCHMARK_RESULTS.md">Empirical Benchmark Data</a></div>
   </footer>
 
-  <!-- Interactive Visualization & Simulation Engine -->
+  <!-- Interactive Visualization & Directed Spline Particle Engine -->
   <script>
     // ── Simulation State & Config ──────────────────────────────────────────────
     const state = {
@@ -978,40 +1072,32 @@
       ]
     };
 
-    // ── Topology Nodes ────────────────────────────────────────────────────────
+    // ── Architectural Nodes Definition ─────────────────────────────────────────
+    // Fixed node boxes representing the 5 primary pipeline stages + DLQ & Egress
     const nodes = [
-      { id: 'clients', label: 'Client VUs', sub: 'HTTP Ingress', x: 0.08, y: 0.5, icon: '👤', color: '#94A3B8' },
-      { id: 'gateway', label: 'Go Gateway', sub: ':8080 Goroutines', x: 0.28, y: 0.5, icon: '⚡', color: '#00F2FE' },
-      { id: 'redis', label: 'Redis 7', sub: 'L1 Fast-Path', x: 0.48, y: 0.22, icon: '🔥', color: '#A855F7' },
-      { id: 'postgres', label: 'PostgreSQL 16', sub: 'Outbox (jobs)', x: 0.48, y: 0.78, icon: '🐘', color: '#38BDF8' },
-      { id: 'workers', label: 'Worker Pool', sub: 'SKIP LOCKED', x: 0.74, y: 0.5, icon: '⚙️', color: '#10B981' },
-      { id: 'dlq', label: 'DLQ / Reaper', sub: 'Watchdog Daemon', x: 0.92, y: 0.8, icon: '🛡️', color: '#EF4444' }
+      { id: 'clients',  label: 'Clients / VUs',   sub: 'HTTP Ingress',        tag: 'k6 Load',      x: 0.08, y: 0.50, color: '#94A3B8', icon: '👤' },
+      { id: 'gateway',  label: 'Go Gateway',      sub: ':8080 Goroutines',    tag: 'pgxpool',      x: 0.27, y: 0.50, color: '#38BDF8', icon: '⚡' },
+      { id: 'redis',    label: 'Redis 7 Fast-Path', sub: 'L1 Atomic Lua',     tag: 'Sub-ms L1',    x: 0.50, y: 0.25, color: '#A855F7', icon: '🔥' },
+      { id: 'postgres', label: 'PostgreSQL 16',   sub: 'Transactional Outbox',tag: 'jobs & tasks', x: 0.50, y: 0.75, color: '#38BDF8', icon: '🐘' },
+      { id: 'workers',  label: 'Worker Pool',     sub: 'SKIP LOCKED',         tag: '50-Batch',     x: 0.73, y: 0.50, color: '#34D399', icon: '⚙️' },
+      { id: 'complete', label: 'Task Sink',       sub: 'Completed 200 OK',    tag: '188.7k Done',  x: 0.92, y: 0.25, color: '#34D399', icon: '✓' },
+      { id: 'dlq',      label: 'DLQ / Watchdog',  sub: 'Reaper Daemon',       tag: 'Max Retries',  x: 0.92, y: 0.75, color: '#F43F5E', icon: '🛡️' }
     ];
 
-    // Connectors between nodes
-    const links = [
-      { from: 'clients', to: 'gateway' },
-      { from: 'gateway', to: 'redis' },
-      { from: 'gateway', to: 'postgres' },
-      { from: 'postgres', to: 'workers' },
-      { from: 'workers', to: 'redis' },
-      { from: 'workers', to: 'dlq' }
-    ];
+    const NODE_WIDTH = 132;
+    const NODE_HEIGHT = 56;
 
-    // Particles system
-    const particles = [];
-    const MAX_PARTICLES = 300;
-
-    class Particle {
-      constructor(fromNode, toNode, color, type) {
-        this.from = fromNode;
-        this.to = toNode;
-        this.color = color;
-        this.type = type;
-        this.progress = 0;
-        this.speed = 0.012 + Math.random() * 0.018;
-        this.size = 2.5 + Math.random() * 2;
-      }
+    // Helper: compute cubic Bézier point B(t)
+    function cubicBezierPoint(p0, p1, p2, p3, t) {
+      const u = 1 - t;
+      const tt = t * t;
+      const uu = u * u;
+      const uuu = uu * u;
+      const ttt = tt * t;
+      return {
+        x: uuu * p0.x + 3 * uu * t * p1.x + 3 * u * tt * p2.x + ttt * p3.x,
+        y: uuu * p0.y + 3 * uu * t * p1.y + 3 * u * tt * p2.y + ttt * p3.y
+      };
     }
 
     // Canvas Setup
@@ -1023,35 +1109,172 @@
       const dpr = window.devicePixelRatio || 1;
       canvas.width = rect.width * dpr;
       canvas.height = rect.height * dpr;
+      ctx.setTransform(1, 0, 0, 1, 0, 0); // reset scale
       ctx.scale(dpr, dpr);
     }
     window.addEventListener('resize', resizeCanvas);
     resizeCanvas();
 
-    // ── Particle Generator ────────────────────────────────────────────────────
-    function spawnParticles() {
+    // ── Spline Path Definitions ────────────────────────────────────────────────
+    // Generates cubic Bézier control points connecting node centers
+    function getSplines(w, h) {
+      const getNode = (id) => nodes.find(n => n.id === id);
+
+      const nClient   = getNode('clients');
+      const nGateway  = getNode('gateway');
+      const nRedis    = getNode('redis');
+      const nPostgres = getNode('postgres');
+      const nWorker   = getNode('workers');
+      const nComplete = getNode('complete');
+      const nDlq      = getNode('dlq');
+
+      const halfW = NODE_WIDTH / 2;
+
+      // 1. Ingress: Clients (center-right) -> Gateway (center-left)
+      const pClientOut = { x: nClient.x * w + halfW, y: nClient.y * h };
+      const pGatewayIn = { x: nGateway.x * w - halfW, y: nGateway.y * h };
+      const dx1 = pGatewayIn.x - pClientOut.x;
+      const sIngress = {
+        name: 'ingress',
+        p0: pClientOut,
+        p1: { x: pClientOut.x + dx1 * 0.5, y: pClientOut.y },
+        p2: { x: pClientOut.x + dx1 * 0.5, y: pGatewayIn.y },
+        p3: pGatewayIn
+      };
+
+      // 2. Gateway (center-right) -> Redis (center-left)
+      const pGatewayOut = { x: nGateway.x * w + halfW, y: nGateway.y * h };
+      const pRedisIn    = { x: nRedis.x * w - halfW, y: nRedis.y * h };
+      const dx2 = pRedisIn.x - pGatewayOut.x;
+      const sGatewayRedis = {
+        name: 'gateway_redis',
+        p0: pGatewayOut,
+        p1: { x: pGatewayOut.x + dx2 * 0.5, y: pGatewayOut.y },
+        p2: { x: pGatewayOut.x + dx2 * 0.5, y: pRedisIn.y },
+        p3: pRedisIn
+      };
+
+      // 3. Gateway (center-right) -> Postgres Outbox (center-left)
+      const pPostgresIn = { x: nPostgres.x * w - halfW, y: nPostgres.y * h };
+      const dx3 = pPostgresIn.x - pGatewayOut.x;
+      const sGatewayPostgres = {
+        name: 'gateway_postgres',
+        p0: pGatewayOut,
+        p1: { x: pGatewayOut.x + dx3 * 0.5, y: pGatewayOut.y },
+        p2: { x: pGatewayOut.x + dx3 * 0.5, y: pPostgresIn.y },
+        p3: pPostgresIn
+      };
+
+      // 4. Redis Fast-Path Hit: Arching spline short-circuiting back to Clients
+      const pRedisOut = { x: nRedis.x * w - halfW, y: nRedis.y * h };
+      const pClientInTop = { x: nClient.x * w, y: nClient.y * h - (NODE_HEIGHT / 2) };
+      const sRedisReturn = {
+        name: 'redis_return',
+        p0: pRedisOut,
+        p1: { x: (pRedisOut.x + pClientInTop.x) * 0.5, y: Math.min(pRedisOut.y, pClientInTop.y) - 55 },
+        p2: { x: pClientInTop.x + 30, y: Math.min(pRedisOut.y, pClientInTop.y) - 55 },
+        p3: pClientInTop
+      };
+
+      // 5. Postgres Outbox -> Workers (SKIP LOCKED)
+      const pPostgresOut = { x: nPostgres.x * w + halfW, y: nPostgres.y * h };
+      const pWorkerIn    = { x: nWorker.x * w - halfW, y: nWorker.y * h };
+      const dx5 = pWorkerIn.x - pPostgresOut.x;
+      const sPostgresWorker = {
+        name: 'postgres_worker',
+        p0: pPostgresOut,
+        p1: { x: pPostgresOut.x + dx5 * 0.5, y: pPostgresOut.y },
+        p2: { x: pPostgresOut.x + dx5 * 0.5, y: pWorkerIn.y },
+        p3: pWorkerIn
+      };
+
+      // 6. Workers -> Task Sink (Completed)
+      const pWorkerOut   = { x: nWorker.x * w + halfW, y: nWorker.y * h };
+      const pCompleteIn  = { x: nComplete.x * w - halfW, y: nComplete.y * h };
+      const dx6 = pCompleteIn.x - pWorkerOut.x;
+      const sWorkerComplete = {
+        name: 'worker_complete',
+        p0: pWorkerOut,
+        p1: { x: pWorkerOut.x + dx6 * 0.5, y: pWorkerOut.y },
+        p2: { x: pWorkerOut.x + dx6 * 0.5, y: pCompleteIn.y },
+        p3: pCompleteIn
+      };
+
+      // 7. Workers -> DLQ (Poison Pill / Retries Exhausted)
+      const pDlqIn = { x: nDlq.x * w - halfW, y: nDlq.y * h };
+      const dx7 = pDlqIn.x - pWorkerOut.x;
+      const sWorkerDlq = {
+        name: 'worker_dlq',
+        p0: pWorkerOut,
+        p1: { x: pWorkerOut.x + dx7 * 0.5, y: pWorkerOut.y },
+        p2: { x: pWorkerOut.x + dx7 * 0.5, y: pDlqIn.y },
+        p3: pDlqIn
+      };
+
+      // 8. DLQ -> Postgres (Watchdog Sweep & Reclaim)
+      const pDlqOutBottom = { x: nDlq.x * w - halfW, y: nDlq.y * h + (NODE_HEIGHT / 2) };
+      const pPostgresInBottom = { x: nPostgres.x * w + halfW, y: nPostgres.y * h + (NODE_HEIGHT / 2) };
+      const sDlqReap = {
+        name: 'dlq_reap',
+        p0: pDlqOutBottom,
+        p1: { x: (pDlqOutBottom.x + pPostgresInBottom.x) * 0.5, y: pDlqOutBottom.y + 40 },
+        p2: { x: (pDlqOutBottom.x + pPostgresInBottom.x) * 0.5, y: pPostgresInBottom.y + 40 },
+        p3: pPostgresInBottom
+      };
+
+      return {
+        sIngress,
+        sGatewayRedis,
+        sGatewayPostgres,
+        sRedisReturn,
+        sPostgresWorker,
+        sWorkerComplete,
+        sWorkerDlq,
+        sDlqReap
+      };
+    }
+
+    // ── Particle System ────────────────────────────────────────────────────────
+    const particles = [];
+    const MAX_PARTICLES = 300;
+
+    class SplineParticle {
+      constructor(spline, color, type, nextAction = null) {
+        this.spline = spline;
+        this.color = color;
+        this.type = type;
+        this.nextAction = nextAction;
+        this.t = 0;
+        this.speed = 0.015 + Math.random() * 0.016;
+        this.size = 2.4;
+      }
+    }
+
+    function spawnParticleSequence() {
       if (particles.length >= MAX_PARTICLES) return;
 
       const rateMultiplier = state.rps / 800;
-      if (Math.random() > 0.15 * rateMultiplier) return;
+      if (Math.random() > 0.16 * rateMultiplier) return;
 
+      const splines = getSplines(canvas.getBoundingClientRect().width, canvas.getBoundingClientRect().height);
       const isHit = Math.random() < state.collisionRate && !state.redisPaused;
 
       if (isHit) {
-        // Fast-path flow: Client -> Gateway -> Redis -> Client
-        particles.push(new Particle(nodes[0], nodes[1], '#A855F7', 'fastpath'));
-        setTimeout(() => {
-          particles.push(new Particle(nodes[1], nodes[2], '#A855F7', 'fastpath'));
-        }, 120);
+        // Fast-path flow: Client -> Gateway (Cyan/Purple) -> Redis -> Client (Purple short-circuit)
+        particles.push(new SplineParticle(splines.sIngress, '#A855F7', 'fastpath', () => {
+          particles.push(new SplineParticle(splines.sGatewayRedis, '#A855F7', 'fastpath', () => {
+            particles.push(new SplineParticle(splines.sRedisReturn, '#A855F7', 'fastpath_return'));
+          }));
+        }));
       } else {
-        // Outbox flow: Client -> Gateway -> Postgres -> Worker
-        particles.push(new Particle(nodes[0], nodes[1], '#00F2FE', 'outbox'));
-        setTimeout(() => {
-          particles.push(new Particle(nodes[1], nodes[3], '#00F2FE', 'outbox'));
-        }, 120);
-        setTimeout(() => {
-          particles.push(new Particle(nodes[3], nodes[4], '#10B981', 'drain'));
-        }, 280);
+        // Fresh Ingestion Outbox Flow: Client -> Gateway -> Postgres -> Worker -> Complete
+        particles.push(new SplineParticle(splines.sIngress, '#38BDF8', 'outbox', () => {
+          particles.push(new SplineParticle(splines.sGatewayPostgres, '#38BDF8', 'outbox', () => {
+            particles.push(new SplineParticle(splines.sPostgresWorker, '#34D399', 'worker', () => {
+              particles.push(new SplineParticle(splines.sWorkerComplete, '#34D399', 'complete'));
+            }));
+          }));
+        }));
       }
     }
 
@@ -1062,89 +1285,114 @@
 
       ctx.clearRect(0, 0, w, h);
 
-      // 1. Draw Links (Curved lines)
-      ctx.lineWidth = 1.5;
-      links.forEach(l => {
-        const from = nodes.find(n => n.id === l.from);
-        const to = nodes.find(n => n.id === l.to);
-        const x1 = from.x * w;
-        const y1 = from.y * h;
-        const x2 = to.x * w;
-        const y2 = to.y * h;
+      const splines = getSplines(w, h);
 
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
+      // 1. Draw Static Directed Spline Tracks
+      const trackList = [
+        splines.sIngress,
+        splines.sGatewayRedis,
+        splines.sGatewayPostgres,
+        splines.sRedisReturn,
+        splines.sPostgresWorker,
+        splines.sWorkerComplete,
+        splines.sWorkerDlq
+      ];
+
+      ctx.lineWidth = 1.2;
+      trackList.forEach(s => {
         ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        const cx = (x1 + x2) / 2;
-        ctx.bezierCurveTo(cx, y1, cx, y2, x2, y2);
+        ctx.moveTo(s.p0.x, s.p0.y);
+        ctx.bezierCurveTo(s.p1.x, s.p1.y, s.p2.x, s.p2.y, s.p3.x, s.p3.y);
+        if (s.name === 'redis_return') {
+          ctx.strokeStyle = 'rgba(168, 85, 247, 0.15)';
+          ctx.setLineDash([4, 4]);
+        } else {
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.055)';
+          ctx.setLineDash([]);
+        }
         ctx.stroke();
       });
+      ctx.setLineDash([]);
 
-      // 2. Draw & Update Particles
+      // 2. Draw & Advance Particles along Directed Splines
       for (let i = particles.length - 1; i >= 0; i--) {
         const p = particles[i];
-        p.progress += p.speed;
+        p.t += p.speed;
 
-        if (p.progress >= 1) {
+        if (p.t >= 1.0) {
+          if (p.nextAction) {
+            p.nextAction();
+          }
           particles.splice(i, 1);
           continue;
         }
 
-        const x1 = p.from.x * w;
-        const y1 = p.from.y * h;
-        const x2 = p.to.x * w;
-        const y2 = p.to.y * h;
-        const cx = (x1 + x2) / 2;
+        // Exact cubic Bézier point calculation
+        const pt = cubicBezierPoint(p.spline.p0, p.spline.p1, p.spline.p2, p.spline.p3, p.t);
 
-        // Bezier interpolation
-        const t = p.progress;
-        const invT = 1 - t;
-        const px = invT * invT * x1 + 2 * invT * t * cx + t * t * x2;
-        const py = invT * invT * y1 + 2 * invT * t * y1 + t * t * y2;
+        // Optional comet trail (sample slightly behind)
+        if (p.t > 0.04) {
+          const ptTrail = cubicBezierPoint(p.spline.p0, p.spline.p1, p.spline.p2, p.spline.p3, p.t - 0.035);
+          ctx.strokeStyle = p.color;
+          ctx.lineWidth = p.size * 0.8;
+          ctx.globalAlpha = 0.35;
+          ctx.beginPath();
+          ctx.moveTo(ptTrail.x, ptTrail.y);
+          ctx.lineTo(pt.x, pt.y);
+          ctx.stroke();
+          ctx.globalAlpha = 1.0;
+        }
 
         ctx.fillStyle = p.color;
         ctx.shadowColor = p.color;
-        ctx.shadowBlur = 8;
+        ctx.shadowBlur = 6;
         ctx.beginPath();
-        ctx.arc(px, py, p.size, 0, Math.PI * 2);
+        ctx.arc(pt.x, pt.y, p.size, 0, Math.PI * 2);
         ctx.fill();
-        ctx.shadowBlur = 0; // reset
+        ctx.shadowBlur = 0;
       }
 
-      // 3. Draw Nodes
+      // 3. Draw Fixed Architectural Node Cards
       nodes.forEach(n => {
         const nx = n.x * w;
         const ny = n.y * h;
-        const nodeW = 120;
-        const nodeH = 54;
+        const x = nx - NODE_WIDTH / 2;
+        const y = ny - NODE_HEIGHT / 2;
 
-        // Node Container Card
-        ctx.fillStyle = '#141824';
-        ctx.strokeStyle = n.color;
+        // Node Container Surface
+        ctx.fillStyle = '#0E1015';
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.08)';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.roundRect(nx - nodeW/2, ny - nodeH/2, nodeW, nodeH, 8);
+        ctx.roundRect(x, y, NODE_WIDTH, NODE_HEIGHT, 8);
         ctx.fill();
         ctx.stroke();
 
-        // Node Glow Ring
-        ctx.shadowColor = n.color;
-        ctx.shadowBlur = 6;
-        ctx.stroke();
-        ctx.shadowBlur = 0;
+        // Subtle Left Color Accent Bar
+        ctx.fillStyle = n.color;
+        ctx.beginPath();
+        ctx.roundRect(x, y + 10, 2.5, NODE_HEIGHT - 20, 1.25);
+        ctx.fill();
 
-        // Text & Icons
-        ctx.font = '12px Inter, sans-serif';
+        // Node Title
+        ctx.font = '600 12px Inter, system-ui, sans-serif';
         ctx.fillStyle = '#F8FAFC';
-        ctx.textAlign = 'center';
-        ctx.fillText(`${n.icon} ${n.label}`, nx, ny - 3);
+        ctx.textAlign = 'left';
+        ctx.fillText(n.label, x + 10, y + 21);
 
-        ctx.font = '10px Geist Mono, monospace';
-        ctx.fillStyle = '#94A3B8';
-        ctx.fillText(n.sub, nx, ny + 13);
+        // Node Subtitle
+        ctx.font = '500 10px JetBrains Mono, monospace';
+        ctx.fillStyle = '#64748B';
+        ctx.fillText(n.sub, x + 10, y + 36);
+
+        // Micro-badge in Top Right
+        ctx.font = '500 9px JetBrains Mono, monospace';
+        ctx.fillStyle = n.color;
+        ctx.textAlign = 'right';
+        ctx.fillText(n.tag, x + NODE_WIDTH - 8, y + 20);
       });
 
-      spawnParticles();
+      spawnParticleSequence();
       requestAnimationFrame(renderPipeline);
     }
     requestAnimationFrame(renderPipeline);
@@ -1172,13 +1420,22 @@
       }
     }
 
+    function formatLogMsg(msg) {
+      // Syntax highlight UUIDs, keys, and metrics in log stream
+      return msg
+        .replace(/([0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12})/gi, '<span class="log-uuid">$1</span>')
+        .replace(/\b([a-f0-9]{8})\b/g, '<span class="log-uuid">$1</span>')
+        .replace(/\b(user_\d+)\b/g, '<span class="log-uuid">$1</span>')
+        .replace(/\b(\d+\.?\d*ms|\d+\.?\d*s|\d+\s*req\/s|\d+\s*VUs)\b/g, '<span class="log-stat">$1</span>');
+    }
+
     function appendLogToDOM(entry) {
       const row = document.createElement('div');
       row.className = 'log-entry';
       row.innerHTML = `
         <span class="log-ts">[${entry.timeStr}]</span>
         <span class="log-tag ${entry.type}">${entry.tag}</span>
-        <span class="log-msg">${entry.msg}</span>
+        <span class="log-msg">${formatLogMsg(entry.msg)}</span>
       `;
       logTerminal.appendChild(row);
       logTerminal.scrollTop = logTerminal.scrollHeight;
@@ -1250,9 +1507,9 @@
         if (fillEl && secEl) {
           fillEl.style.width = `${pct}%`;
           secEl.textContent = `${w.hb.toFixed(1)}s`;
-          if (w.hb > 5) fillEl.style.backgroundColor = 'var(--green)';
+          if (w.hb > 5) fillEl.style.backgroundColor = 'var(--emerald)';
           else if (w.hb > 2) fillEl.style.backgroundColor = 'var(--amber)';
-          else fillEl.style.backgroundColor = 'var(--red)';
+          else fillEl.style.backgroundColor = 'var(--rose)';
         }
       });
     }, 100);
@@ -1285,7 +1542,7 @@
 
     // ── Chaos Actions ─────────────────────────────────────────────────────────
 
-    // 1. Crash Go Worker 2
+    // 1. Crash Go Worker 2 (SIGKILL)
     const btnCrashWorker = document.getElementById('btnCrashWorker');
     const cardWorker2 = document.getElementById('cardWorker2');
     const statusWorker2 = document.getElementById('statusWorker2');
@@ -1294,7 +1551,7 @@
       state.workers[1].crashed = true;
       cardWorker2.classList.add('crashed');
       statusWorker2.textContent = 'CRASHED';
-      statusWorker2.style.color = 'var(--red)';
+      statusWorker2.style.color = 'var(--rose)';
       addLog('dlq', 'SIGKILL', 'Worker worker-go-02 process terminated unexpectedly (host OOM)');
 
       const clusterStatus = document.getElementById('clusterStatusBadge');
@@ -1302,11 +1559,15 @@
       clusterStatus.className = 'cluster-status amber';
       clusterText.textContent = 'DEGRADED: WORKER REAPING';
 
-      // Trigger Watchdog Reaper after 3 seconds
+      // Trigger Watchdog Reaper after 2.5 seconds
       setTimeout(() => {
         addLog('reaper', 'REAPER-SWEEP', 'Watchdog sweep: detected stale heartbeat (>30s) on worker-go-02 tasks');
         addLog('reaper', 'LOCK-EVICT', 'Unconditionally deleted Redis distributed lock key lock:task:c298f...');
         addLog('reaper', 'RE-QUEUED', 'Task c298f... reset to PENDING (retry_count incremented 0 -> 1)');
+
+        // Animate amber reap spline particles back to Postgres
+        const splines = getSplines(canvas.getBoundingClientRect().width, canvas.getBoundingClientRect().height);
+        particles.push(new SplineParticle(splines.sDlqReap, '#F59E0B', 'reaper'));
         
         // Recover Worker 2 after 6s
         setTimeout(() => {
@@ -1314,7 +1575,7 @@
           state.workers[1].hb = 10.0;
           cardWorker2.classList.remove('crashed');
           statusWorker2.textContent = 'ACTIVE';
-          statusWorker2.style.color = 'var(--green)';
+          statusWorker2.style.color = 'var(--emerald)';
           clusterStatus.className = 'cluster-status';
           clusterText.textContent = 'CLUSTER HEALTHY';
           addLog('claim', 'RESTARTED', 'worker-go-02 provisioned new pod -> resumed SKIP LOCKED polling');
@@ -1322,7 +1583,7 @@
       }, 2500);
     });
 
-    // 2. Freeze Redis (Chaos)
+    // 2. Freeze Redis (3.4s Chaos)
     const btnRedisFreeze = document.getElementById('btnRedisFreeze');
     btnRedisFreeze.addEventListener('click', () => {
       state.redisPaused = true;
@@ -1348,7 +1609,7 @@
       }, 3424);
     });
 
-    // 3. Inject Poison Pill
+    // 3. Inject Poison Pill Task
     const btnInjectPoison = document.getElementById('btnInjectPoison');
     btnInjectPoison.addEventListener('click', () => {
       const id = randomUUID().slice(0, 8);
@@ -1367,7 +1628,10 @@
         addLog('dlq', 'DEAD-LETTER', `Task ${id} exceeded max_retries (3) -> promoted to DEAD_LETTER; parent job marked FAILED`);
         state.queue.dlq++;
         document.getElementById('txtDlq').textContent = state.queue.dlq;
-        particles.push(new Particle(nodes[4], nodes[5], '#EF4444', 'dlq'));
+        
+        // Spawn Rose particle traveling directly down spline into DLQ
+        const splines = getSplines(canvas.getBoundingClientRect().width, canvas.getBoundingClientRect().height);
+        particles.push(new SplineParticle(splines.sWorkerDlq, '#F43F5E', 'dlq'));
       }, 3600);
     });
 
@@ -1376,7 +1640,7 @@
     btnBurstStress.addEventListener('click', () => {
       sliderRps.value = 2500;
       sliderRps.dispatchEvent(new Event('input'));
-      document.getElementById('kpiPoolConns').innerHTML = '150 <span style="font-size: 14px; color: var(--amber)">/ 150 (SATURATED)</span>';
+      document.getElementById('kpiPoolConns').innerHTML = '150 <span style="font-size: 13px; color: var(--amber)">/ 150 (SATURATED)</span>';
       document.getElementById('kpiP95').textContent = '2,940.0';
       document.getElementById('kpiP95').style.color = 'var(--amber)';
 
@@ -1391,7 +1655,7 @@
       setTimeout(() => {
         sliderRps.value = 1133;
         sliderRps.dispatchEvent(new Event('input'));
-        document.getElementById('kpiPoolConns').innerHTML = '25 <span style="font-size: 14px; color: var(--text-dim)">/ 150</span>';
+        document.getElementById('kpiPoolConns').innerHTML = '25 <span style="font-size: 13px; color: var(--text-dim)">/ 150</span>';
         document.getElementById('kpiP95').textContent = '966.8';
         document.getElementById('kpiP95').style.color = 'var(--text)';
         clusterStatus.className = 'cluster-status';
@@ -1425,7 +1689,6 @@
         const resp = await fetch('http://localhost:8080/metrics');
         if (resp.ok) {
           const text = await resp.text();
-          // Parse basic Prometheus metrics if available
           const reqMatch = text.match(/gateway_requests_total\{.*?\} (\d+)/);
           const hitMatch = text.match(/gateway_idempotency_hits_total (\d+)/);
           if (reqMatch) {
@@ -1444,7 +1707,7 @@
       setTimeout(pollLiveMetrics, 2000);
     }
 
-    // Initial log entries
+    // Initial system log entries
     addLog('outbox', 'SYS-INIT', 'Distributed Transaction Engine console initialized');
     addLog('idemp', 'REDIS-READY', 'Redis 7 connection pool established (PoolSize: 500)');
     addLog('outbox', 'PG-READY', 'pgxpool v5 initialized (MaxConns: 150, MinConns: 25)');
