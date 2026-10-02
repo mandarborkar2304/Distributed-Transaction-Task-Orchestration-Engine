@@ -3,9 +3,6 @@ name: Deploy Demo to GitHub Pages
 on:
   push:
     branches: ["main"]
-    paths:
-      - "web/**"
-      - ".github/workflows/deploy-pages.yml"
   workflow_dispatch:
 
 permissions:
@@ -33,7 +30,6 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          # Serves the static dashboard directory directly
           path: 'web'
 
       - name: Deploy to GitHub Pages
