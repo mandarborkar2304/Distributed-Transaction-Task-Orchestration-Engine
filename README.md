@@ -1,3 +1,5 @@
+[![CI](https://github.com/mandarborkar2304/Distributed-Transaction-Task-Orchestration-Engine/actions/workflows/ci.yml/badge.svg)](https://github.com/mandarborkar2304/Distributed-Transaction-Task-Orchestration-Engine/actions/workflows/ci.yml)
+
 # Distributed Transaction & Task Orchestration Engine
 
 A production-grade, cloud-native task orchestration system providing **guaranteed at-least-once execution**, **worker starvation prevention**, and **two-tier idempotent ingestion** — built on PostgreSQL 16, Redis 7, and Python asyncio.
