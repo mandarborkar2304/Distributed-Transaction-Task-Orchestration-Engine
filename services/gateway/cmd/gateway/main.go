@@ -62,6 +62,24 @@ func main() {
 		w.Write([]byte("ok")) //nolint:errcheck
 	})
 
+	// Real-time architecture visualizer & simulation console.
+	mux.HandleFunc("GET /demo", func(w http.ResponseWriter, r *http.Request) {
+		candidates := []string{
+			"web/index.html",
+			"../../web/index.html",
+			"../web/index.html",
+			"/workspaces/Distributed-Transaction-Task-Orchestration-Engine/web/index.html",
+		}
+		for _, p := range candidates {
+			if data, err := os.ReadFile(p); err == nil {
+				w.Header().Set("Content-Type", "text/html; charset=utf-8")
+				w.Write(data) //nolint:errcheck
+				return
+			}
+		}
+		http.Error(w, "Demo visualizer not found", http.StatusNotFound)
+	})
+
 	srv := &http.Server{
 		Addr:         listenAddr,
 		Handler:      mux,
