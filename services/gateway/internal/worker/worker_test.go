@@ -296,5 +296,6 @@ func TestWorkerHeartbeatTickerUpdatesDB(t *testing.T) {
 	}
 
 	t.Logf("Heartbeat ticker PASS: updated timestamp from %v to %v across %d ticks",
-		staleTime.Format(time.RFC3339), updatedHeartbeat.Format(time.RFC3339), tickCount)
+		staleTime.Format(time.RFC3339), updatedHeartbeat.Format(time.RFC3339), tickCount.Load())
 }
+
