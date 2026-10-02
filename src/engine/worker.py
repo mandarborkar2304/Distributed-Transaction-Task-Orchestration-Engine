@@ -1,20 +1,25 @@
 import asyncio
-import uuid
+import logging
 import random
+import time
+import uuid
 from datetime import datetime, timezone
-from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, update
 from sqlalchemy.orm import selectinload
 
 from src.database import AsyncSessionLocal
-from src.models import JobTask, TaskStatus, Job
+from src.models import JobTask, TaskStatus
+from src.redis_client import redis_client, RedisDistributedLock
 from src.engine.handlers.payment import PaymentTaskHandler
 from src.engine.handlers.compute import ComputeTaskHandler
+
+logger = logging.getLogger(__name__)
 
 HANDLERS = {
     "payment_handler": PaymentTaskHandler(),
     "compute_handler": ComputeTaskHandler()
 }
+
 
 class Worker:
     def __init__(self, batch_size=10, worker_id=None):
@@ -28,13 +33,22 @@ class Worker:
                 # 10s wait, using wait_for allows quick cancellation
                 await asyncio.wait_for(cancel_event.wait(), timeout=10.0)
             except asyncio.TimeoutError:
-                # Renew heartbeat
-                async with AsyncSessionLocal() as session:
-                    stmt = update(JobTask).where(JobTask.id == task_id).values(
-                        heartbeat_at=datetime.now(timezone.utc)
-                    )
-                    await session.execute(stmt)
-                    await session.commit()
+                # Renew heartbeat in PostgreSQL
+                try:
+                    async with AsyncSessionLocal() as session:
+                        stmt = update(JobTask).where(JobTask.id == task_id).values(
+                            heartbeat_at=datetime.now(timezone.utc)
+                        )
+                        await session.execute(stmt)
+                        await session.commit()
+                except Exception as e:
+                    logger.warning("Failed to renew DB heartbeat for task %s: %s", task_id, e)
+
+                # Renew Redis lock TTL
+                try:
+                    await redis_client.expire(f"lock:task:{task_id}", 60)
+                except Exception as e:
+                    logger.warning("Failed to renew Redis lock TTL for task %s: %s", task_id, e)
             except asyncio.CancelledError:
                 break
                 
@@ -44,7 +58,6 @@ class Worker:
     async def run_once(self):
         async with AsyncSessionLocal() as session:
             # Poll and claim
-            # SELECT ... FROM job_tasks WHERE status = 'PENDING' ORDER BY created_at ASC LIMIT :batch_size FOR UPDATE SKIP LOCKED
             stmt = (
                 select(JobTask)
                 .where(JobTask.status == TaskStatus.PENDING)
@@ -58,7 +71,7 @@ class Worker:
             if not tasks:
                 return 0
 
-            # Claim atomically
+            # Claim atomically in DB
             now = datetime.now(timezone.utc)
             for t in tasks:
                 t.status = TaskStatus.RUNNING
@@ -68,13 +81,19 @@ class Worker:
             await session.commit()
             
         # Process claimed tasks concurrently
-        # To avoid blocking, we can spawn tasks for each
         coros = [self._process_task(t.id) for t in tasks]
         await asyncio.gather(*coros)
         
         return len(tasks)
 
     async def _process_task(self, task_id):
+        # Acquire Redis distributed lock with worker_id ownership
+        lock = RedisDistributedLock(f"lock:task:{task_id}", owner_id=self.worker_id, ttl_seconds=60)
+        acquired = await lock.acquire()
+        if not acquired:
+            logger.warning("Worker %s could not acquire Redis lock for task %s, skipping", self.worker_id, task_id)
+            return
+
         cancel_event = asyncio.Event()
         heartbeat_task = asyncio.create_task(self._heartbeat_loop(task_id, cancel_event))
         
@@ -92,7 +111,6 @@ class Worker:
                 error_msg = None
                 
                 from src.observability.metrics import tasks_total, execution_duration
-                import time
                 start_time = time.time()
                 
                 if handler:
@@ -130,14 +148,12 @@ class Worker:
                     else:
                         tasks_total.labels(status="FAILED", handler=task.handler_name).inc()
                         
-                        # Compute backoff and sleep before reverting to PENDING
                         backoff = self.get_backoff(task.retry_count)
                         task.last_error = error_msg
-                        await session.commit() # commit the last_error first? no, keep it RUNNING during sleep
+                        await session.commit()
                         
                         await asyncio.sleep(backoff)
                         
-                        # Re-fetch as we slept
                         task.status = TaskStatus.PENDING
                         task.retry_count += 1
                         task.locked_by = None
@@ -148,13 +164,14 @@ class Worker:
         finally:
             cancel_event.set()
             await heartbeat_task
+            await lock.release()
 
     async def start(self):
         self._running = True
         while self._running:
             processed = await self.run_once()
             if processed == 0:
-                await asyncio.sleep(1) # idle sleep
+                await asyncio.sleep(1)
 
     def stop(self):
         self._running = False

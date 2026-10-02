@@ -35,7 +35,12 @@ class Job(Base):
     status = Column(Enum(TaskStatus), nullable=False, default=TaskStatus.PENDING)
     created_at = Column(TIMESTAMP(timezone=True), default=utc_now, nullable=False)
 
-    tasks = relationship("JobTask", back_populates="job", cascade="all, delete-orphan")
+    tasks = relationship("JobTask", back_populates="job", cascade="all, delete-orphan", lazy="selectin")
+
+    __table_args__ = (
+        Index("ix_jobs_status_created_at", "status", "created_at"),
+        Index("ix_jobs_idempotency_key", "idempotency_key", unique=True),
+    )
 
 
 class JobTask(Base):
@@ -54,13 +59,15 @@ class JobTask(Base):
     created_at = Column(TIMESTAMP(timezone=True), default=utc_now, nullable=False)
     updated_at = Column(TIMESTAMP(timezone=True), default=utc_now, onupdate=utc_now, nullable=False)
 
-    job = relationship("Job", back_populates="tasks")
+    job = relationship("Job", back_populates="tasks", lazy="selectin")
 
     __table_args__ = (
+        Index("ix_job_tasks_status_created_at", "status", "created_at"),
         Index(
-            "ix_job_tasks_status_created_at",
+            "ix_job_tasks_pending_running",
             "status",
             "created_at",
             postgresql_where=text("status IN ('PENDING', 'RUNNING')")
         ),
+        Index("ix_job_tasks_job_id", "job_id"),
     )

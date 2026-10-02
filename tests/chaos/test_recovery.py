@@ -1,37 +1,14 @@
 import pytest
-import pytest_asyncio
 import uuid
 from datetime import datetime, timezone, timedelta
-from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
-from src.database import Base
+from src.database import AsyncSessionLocal
 from src.models import Job, JobTask, TaskStatus
 from src.engine.watchdog import Watchdog
-
-TEST_DB_URL = "postgresql+asyncpg://postgres:password@localhost:5432/orchestrator"
-engine = create_async_engine(TEST_DB_URL, echo=False)
-TestingSessionLocal = async_sessionmaker(bind=engine, expire_on_commit=False)
-
-@pytest_asyncio.fixture(scope="function")
-async def db_setup():
-    try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-            await conn.run_sync(Base.metadata.create_all)
-    except (ConnectionRefusedError, OSError) as e:
-        pytest.skip(f"Database not available: {e}")
-        
-    yield
-
-    try:
-        async with engine.begin() as conn:
-            await conn.run_sync(Base.metadata.drop_all)
-    except Exception:
-        pass
 
 
 @pytest.mark.asyncio
 async def test_watchdog_recovery(db_setup):
-    async with TestingSessionLocal() as session:
+    async with AsyncSessionLocal() as session:
         job = Job(idempotency_key=f"chaos_test_{uuid.uuid4()}", job_type="payment")
         session.add(job)
         await session.flush()
@@ -54,7 +31,7 @@ async def test_watchdog_recovery(db_setup):
     watchdog = Watchdog()
     await watchdog.run_once()
     
-    async with TestingSessionLocal() as session:
+    async with AsyncSessionLocal() as session:
         t = await session.get(JobTask, task_id)
         assert t.status == TaskStatus.PENDING
         assert t.retry_count == 1
@@ -64,7 +41,7 @@ async def test_watchdog_recovery(db_setup):
 
 @pytest.mark.asyncio
 async def test_watchdog_dead_letter(db_setup):
-    async with TestingSessionLocal() as session:
+    async with AsyncSessionLocal() as session:
         job = Job(idempotency_key=f"chaos_dead_{uuid.uuid4()}", job_type="payment")
         session.add(job)
         await session.flush()
@@ -87,7 +64,7 @@ async def test_watchdog_dead_letter(db_setup):
     watchdog = Watchdog()
     await watchdog.run_once()
     
-    async with TestingSessionLocal() as session:
+    async with AsyncSessionLocal() as session:
         t = await session.get(JobTask, task_id)
         assert t.status == TaskStatus.DEAD_LETTER
         assert 'Watchdog: Heartbeat expired' in t.last_error
