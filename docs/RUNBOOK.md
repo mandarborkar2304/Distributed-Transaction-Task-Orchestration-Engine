@@ -1,301 +1,229 @@
 # Runbook — SRE & Operational Guide
 
-This runbook documents investigation procedures, diagnostic SQL queries, and recovery actions for the Distributed Transaction & Task Orchestration Engine in a production or staging environment.
-
-All SQL is written for PostgreSQL 16. All Redis commands are written for `redis-cli`.
+This runbook documents operational procedures, troubleshooting workflows, diagnostic SQL recipes, and alert remediation playbooks for the polyglot (Go + Python) Distributed Transaction & Task Orchestration Engine.
 
 ---
 
 ## Table of Contents
 
 1. [Operational Procedures](#1-operational-procedures)
-   - [Investigating Stuck Tasks](#11-investigating-stuck-tasks)
-   - [Connection Pool Exhaustion](#12-connection-pool-exhaustion)
-   - [Redis Failover & Eviction](#13-redis-failover--eviction)
-   - [Diagnosing Long-Running Transactions](#14-diagnosing-long-running-transactions)
-   - [Clearing Poison-Pill Tasks from the DLQ](#15-clearing-poison-pill-tasks-from-the-dlq)
+   - [1.1 Diagnosing `pgxpool` Connection Starvation](#11-diagnosing-pgxpool-connection-starvation)
+   - [1.2 Investigating Goroutine Leaks in the Go Gateway](#12-investigating-goroutine-leaks-in-the-go-gateway)
+   - [1.3 Partition Maintenance: Attaching & Detaching Monthly Tables](#13-partition-maintenance-attaching--detaching-monthly-tables)
+   - [1.4 Investigating Stuck Tasks & Cross-Runtime Worker Crashes](#14-investigating-stuck-tasks--cross-runtime-worker-crashes)
+   - [1.5 Redis Failover & Cache Degraded State](#15-redis-failover--cache-degraded-state)
+   - [1.6 Clearing & Replaying Dead-Lettered (DLQ) Tasks](#16-clearing--replaying-dead-lettered-dlq-tasks)
 2. [Diagnostic SQL Recipes](#2-diagnostic-sql-recipes)
-   - [Stale Heartbeat Detection](#21-stale-heartbeat-detection)
-   - [Worker Claim Contention](#22-worker-claim-contention)
-   - [Failure & DLQ Distribution](#23-failure--dlq-distribution)
-   - [Task Throughput Over Time](#24-task-throughput-over-time)
-   - [Index Usage Verification](#25-index-usage-verification)
+   - [2.1 Partition Health & Row Distribution](#21-partition-health--row-distribution)
+   - [2.2 Active Worker Leases (Go vs. Python Runtimes)](#22-active-worker-leases-go-vs-python-runtimes)
+   - [2.3 Stale Heartbeat Detection (>30s)](#23-stale-heartbeat-detection-30s)
+   - [2.4 Lock Contention & Worker Throughput](#24-lock-contention--worker-throughput)
+   - [2.5 Index Scan Verification](#25-index-scan-verification)
 3. [Alert Response Playbooks](#3-alert-response-playbooks)
 
 ---
 
 ## 1. Operational Procedures
 
-### 1.1 Investigating Stuck Tasks
+### 1.1 Diagnosing `pgxpool` Connection Starvation
 
-**Symptom:** Tasks remain in `RUNNING` status for an extended period without a `heartbeat_at` update. The `orchestrator_reclaimed_orphans_total` counter is not incrementing, or it is incrementing repeatedly for the same tasks.
+**Symptom:**
+- HTTP ingestion latency on `:8080` spikes above 2,000 ms.
+- Go Gateway logs contain `context deadline exceeded` or `conn pool acquisition timeout`.
+- Prometheus metric `gateway_latency_seconds{handler="create_job"}` p95 tail shifts toward 4–5 seconds.
 
-**Step 1 — Identify the stuck tasks:**
+**Root Cause:**
+The Go Gateway is configured with `pgxpool.Config{MaxConns: 150, MinConns: 25}`. If concurrent client load exceeds available connections and transactions take longer than normal (e.g. slow disk I/O, heavy lock contention), requests queue up in-memory waiting for an available connection lease.
 
-```sql
-SELECT
-    jt.id,
-    jt.job_id,
-    jt.handler_name,
-    jt.status,
-    jt.retry_count,
-    jt.max_retries,
-    jt.locked_by,
-    jt.heartbeat_at,
-    NOW() - jt.heartbeat_at AS staleness,
-    jt.last_error
-FROM job_tasks jt
-WHERE jt.status = 'RUNNING'
-ORDER BY jt.heartbeat_at ASC NULLS FIRST;
-```
+**Diagnosis Steps:**
 
-**Step 2 — Check if the locking worker is still alive:**
+1. **Check PostgreSQL Active Connections vs. Backend Limit**:
+   ```sql
+   SELECT count(*) AS total_conns,
+          current_setting('max_connections')::int AS max_conns,
+          round(100.0 * count(*) / current_setting('max_connections')::int, 2) AS pct_used
+   FROM pg_stat_activity;
+   ```
 
-Using the `locked_by` UUID from the query above:
+2. **Inspect Connection States for the `orchestrator` Database**:
+   ```sql
+   SELECT state, wait_event_type, wait_event, count(*)
+   FROM pg_stat_activity
+   WHERE datname = 'orchestrator'
+   GROUP BY state, wait_event_type, wait_event
+   ORDER BY count(*) DESC;
+   ```
 
-```sql
--- Check if any other tasks are running under the same worker_id
-SELECT id, handler_name, heartbeat_at
-FROM job_tasks
-WHERE locked_by = '<worker_uuid_from_above>';
-```
+3. **Identify Queries Holding Open Transactions**:
+   ```sql
+   SELECT pid, now() - xact_start AS xact_age, query
+   FROM pg_stat_activity
+   WHERE datname = 'orchestrator'
+     AND state != 'idle'
+     AND xact_start IS NOT NULL
+   ORDER BY xact_age DESC
+   LIMIT 5;
+   ```
 
-**Step 3 — Check Redis lock state:**
+**Remediation:**
+- If transactions are stalled on a locks: soft-cancel the blocking backend with `SELECT pg_cancel_backend(<pid>);`.
+- If connection pool demand is legitimately exceeding 150 connections due to traffic spikes:
+  1. Increase `max_connections` in PostgreSQL if server RAM allows:
+     ```sql
+     ALTER SYSTEM SET max_connections = 750;
+     SELECT pg_reload_conf();
+     ```
+  2. Scale horizontally by provisioning an additional Go gateway instance behind an external load balancer rather than inflating a single node's `MaxConns` beyond 200.
 
-```bash
-redis-cli GET "lock:task:<task_uuid>"
-# Returns worker_id if lock is still held, or (nil) if expired
-redis-cli TTL "lock:task:<task_uuid>"
-# Returns remaining TTL in seconds; -2 = key does not exist
-```
+---
 
-**Step 4 — Diagnose Watchdog:**
+### 1.2 Investigating Goroutine Leaks in the Go Gateway
 
-Verify the Watchdog daemon is running and check its logs. The Watchdog queries for tasks where `heartbeat_at < NOW() - 30s`. If a task has a stale heartbeat but the Watchdog is not reclaiming it:
-- The Watchdog process may have crashed silently. Restart it.
-- The Watchdog may be blocked waiting for a PostgreSQL connection (check connection pool exhaustion — see §1.2).
+**Symptom:**
+- Process memory (RSS) climbs monotonically without stabilizing post-garbage collection.
+- `go_goroutines` metric on `:8080/metrics` continuously increases without returning to baseline (baseline is ~10–20 idle goroutines).
 
-**Step 5 — Manual forced reclaim (last resort):**
+**Diagnosis Steps:**
 
-Only execute this after confirming the worker process is dead and no Redis lock exists for the task:
+1. **Inspect Active Goroutine Count via Prometheus**:
+   ```promql
+   go_goroutines{job="gateway"}
+   ```
+
+2. **Capture Goroutine Stack Dump**:
+   Execute a SIGABRT or curl the diagnostic debug endpoint (if enabled) or use GDB/Delve:
+   ```bash
+   # Check thread and file descriptor counts for the binary:
+   ps -u $USER -L -o pid,tid,class,rtprio,ni,pri,psr,stat,wchan:14,comm
+   ls -la /proc/$(pgrep gateway)/fd | wc -l
+   ```
+
+3. **Verify Channel and Ticker Closure**:
+   Ensure all `time.NewTicker` instances have corresponding `defer ticker.Stop()` and `heartbeatDone` channel close events. In `services/gateway/cmd/worker/main.go`, verify:
+   ```go
+   heartbeatDone := make(chan struct{})
+   defer close(heartbeatDone)
+   ```
+   A missing `close(heartbeatDone)` will leave the heartbeat ticker goroutine running indefinitely after task completion.
+
+---
+
+### 1.3 Partition Maintenance: Attaching & Detaching Monthly Tables
+
+When [`docs/migrations/001_partition_job_tasks.sql`](migrations/001_partition_job_tasks.sql) is active, monthly partitions must be provisioned ahead of time to avoid routing traffic to `job_tasks_default`.
+
+#### 1. Provision New Future Monthly Partition
+Run this at least 7 days before the start of a new calendar month:
 
 ```sql
 BEGIN;
 
-UPDATE job_tasks
-SET
-    status = 'PENDING',
-    retry_count = retry_count + 1,
-    locked_by = NULL,
-    heartbeat_at = NULL,
-    last_error = 'Manual reclaim by SRE: worker confirmed dead'
-WHERE id = '<task_uuid>'
-  AND status = 'RUNNING';
+-- Example: Provision partition for January 2027
+CREATE TABLE IF NOT EXISTS job_tasks_2027_01 PARTITION OF job_tasks
+    FOR VALUES FROM ('2027-01-01 00:00:00+00') TO ('2027-02-01 00:00:00+00');
 
--- Verify one row affected before committing
+COMMIT;
+```
+
+#### 2. Detach Old Historical Partition (Data Retention Archival)
+To archive or truncate completed tasks older than 6 months without locking the active table:
+
+```sql
+BEGIN;
+
+-- Detach partition concurrently (leaves table standalone without dropping data)
+ALTER TABLE job_tasks DETACH PARTITION job_tasks_2026_01 CONCURRENTLY;
+
+-- Optional: Export to cold storage or drop table to reclaim NVMe storage
+DROP TABLE job_tasks_2026_01;
+
 COMMIT;
 ```
 
 ---
 
-### 1.2 Connection Pool Exhaustion
+### 1.4 Investigating Stuck Tasks & Cross-Runtime Worker Crashes
 
-**Symptom:** Application logs contain `asyncpg.exceptions.TooManyConnectionsError` or SQLAlchemy `TimeoutError: QueuePool limit of size 25 overflow 50 reached, connection timed out after 30 sec`. Prometheus shows elevated p99 latency.
+**Symptom:**
+- A task remains in `status = 'RUNNING'` for over 60 seconds.
+- Neither Go nor Python workers are making progress on it.
 
-**Step 1 — Check active PostgreSQL connections:**
-
+**Step 1 — Identify the Stalled Task & Responsible Worker**:
 ```sql
-SELECT
-    state,
-    wait_event_type,
-    wait_event,
-    COUNT(*) AS connection_count,
-    MAX(NOW() - query_start) AS longest_running
-FROM pg_stat_activity
-WHERE datname = 'orchestrator'
-GROUP BY state, wait_event_type, wait_event
-ORDER BY connection_count DESC;
+SELECT id, job_id, handler_name, locked_by, heartbeat_at,
+       EXTRACT(EPOCH FROM (NOW() - heartbeat_at)) AS seconds_stale,
+       retry_count, max_retries
+FROM job_tasks
+WHERE status = 'RUNNING'
+ORDER BY heartbeat_at ASC NULLS FIRST
+LIMIT 10;
 ```
 
-**Step 2 — Find long-running idle connections:**
-
-```sql
-SELECT
-    pid,
-    state,
-    wait_event,
-    query,
-    NOW() - state_change AS idle_duration
-FROM pg_stat_activity
-WHERE datname = 'orchestrator'
-  AND state = 'idle'
-  AND NOW() - state_change > INTERVAL '5 minutes'
-ORDER BY idle_duration DESC;
-```
-
-**Step 3 — Terminate stuck idle connections if needed:**
-
-```sql
--- Terminate connections idle for more than 10 minutes
-SELECT pg_terminate_backend(pid)
-FROM pg_stat_activity
-WHERE datname = 'orchestrator'
-  AND state = 'idle'
-  AND NOW() - state_change > INTERVAL '10 minutes';
-```
-
-**Step 4 — Tune pool parameters if chronic:**
-
-In [`src/database.py`](../src/database.py), the pool is configured as:
-```python
-engine = create_async_engine(
-    settings.DATABASE_URL,
-    pool_size=25,
-    max_overflow=50,
-    pool_timeout=30.0,
-)
-```
-
-With `N` Uvicorn workers, maximum connections = `N × 75`. If the PostgreSQL `max_connections` limit is being hit:
-
-```sql
--- Check current max_connections setting
-SHOW max_connections;
-
--- Increase it (requires PostgreSQL reload or restart)
-ALTER SYSTEM SET max_connections = 500;
-SELECT pg_reload_conf();
-```
-
-Or reduce `pool_size` and `max_overflow` in `src/database.py` and restart the application.
-
----
-
-### 1.3 Redis Failover & Eviction
-
-**Symptom:** Application logs contain `redis.exceptions.ConnectionError` or `redis.exceptions.ResponseError`. Idempotency cache hits drop to zero and all requests hit PostgreSQL.
-
-**Immediate Impact Assessment:**
-
-| Redis state | Effect on system |
-|---|---|
-| Redis unreachable | `POST /v1/jobs` falls through to PostgreSQL on every request (increased DB load). All idempotency cache writes fail silently (logged as warnings). Distributed locks cannot be acquired — worker processes skip tasks and log warnings. |
-| Redis key eviction (OOM) | Idempotency keys are evicted; duplicate requests generate new `INSERT ... ON CONFLICT` sequences. PostgreSQL unique constraint prevents double-inserts — correctness is maintained but Redis cache benefits are lost. |
-
-**Step 1 — Check Redis connectivity:**
-
+**Step 2 — Inspect Redis Distributed Lock**:
 ```bash
-redis-cli -h localhost -p 6379 PING
-# Expected: PONG
+redis-cli GET "lock:task:<task_uuid>"
+# Returns worker UUID if lock lease is active; (nil) if expired
+redis-cli TTL "lock:task:<task_uuid>"
+# Returns seconds remaining; -2 indicates key expired/deleted
 ```
 
-**Step 2 — Check Redis memory pressure:**
+**Step 3 — Watchdog Verification**:
+The autonomous Python Watchdog sweeps every 15 seconds. If `heartbeat_at < NOW() - INTERVAL '30 seconds'`, the Watchdog automatically:
+1. Deletes the Redis lock key `lock:task:<task_uuid>`.
+2. Resets the task to `PENDING` (if `retry_count + 1 < max_retries`).
+3. Clears `locked_by` and `heartbeat_at`.
 
-```bash
-redis-cli INFO memory | grep -E "used_memory_human|maxmemory_human|mem_fragmentation_ratio"
-```
-
-**Step 3 — Check eviction policy:**
-
-```bash
-redis-cli CONFIG GET maxmemory-policy
-# For idempotency safety, prefer: allkeys-lru or volatile-lru
-# Avoid: allkeys-random (evicts locks randomly, may cause task double-execution)
-```
-
-**Step 4 — On Redis reconnect, warm idempotency cache from PostgreSQL:**
-
-If Redis was unavailable for an extended period, recent jobs may not have their idempotency keys cached. Clients retrying will hit PostgreSQL and encounter `ON CONFLICT DO NOTHING`, which is safe. No manual cache warming is required — the cache self-populates on the next unique submission for each key.
-
-**Step 5 — Verify distributed locks after reconnect:**
-
-After Redis reconnect, any `RUNNING` tasks whose Redis locks have expired will be reclaimed by the Watchdog on its next cycle (within 15 seconds). Monitor `orchestrator_reclaimed_orphans_total` for a spike immediately following Redis reconnection — this is expected and not an error.
-
----
-
-### 1.4 Diagnosing Long-Running Transactions
-
-**Symptom:** `SKIP LOCKED` queries are slower than expected, or the Watchdog is holding locks longer than its interval. Postgres shows blocked queries.
-
-**Step 1 — Find long-running transactions:**
-
-```sql
-SELECT
-    pid,
-    now() - pg_stat_activity.xact_start AS duration,
-    query,
-    state,
-    wait_event_type,
-    wait_event
-FROM pg_stat_activity
-WHERE datname = 'orchestrator'
-  AND state != 'idle'
-  AND xact_start IS NOT NULL
-ORDER BY duration DESC;
-```
-
-**Step 2 — Check for lock waits:**
-
-```sql
-SELECT
-    blocked.pid AS blocked_pid,
-    blocked.query AS blocked_query,
-    blocking.pid AS blocking_pid,
-    blocking.query AS blocking_query,
-    now() - blocked.query_start AS blocked_duration
-FROM pg_stat_activity blocked
-JOIN pg_stat_activity blocking
-    ON blocking.pid = ANY(pg_blocking_pids(blocked.pid))
-WHERE datname = 'orchestrator';
-```
-
-**Step 3 — Cancel a blocking query:**
-
-```sql
--- Soft cancel (sends SIGINT to the backend; query may retry)
-SELECT pg_cancel_backend(<blocking_pid>);
-
--- Hard terminate (sends SIGTERM; connection dropped)
-SELECT pg_terminate_backend(<blocking_pid>);
-```
-
-> **Important:** `SKIP LOCKED` is designed specifically to avoid blocking. If you see blocked queries, they are likely caused by long-running transactions outside the normal worker/watchdog flow (e.g., a `psql` session with an open transaction, or a schema migration).
-
----
-
-### 1.5 Clearing Poison-Pill Tasks from the DLQ
-
-**Symptom:** Tasks accumulate in `DEAD_LETTER` status. The `orchestrator_tasks_total{status="DEAD_LETTER"}` counter is growing. Some tasks need to be replayed; others need to be permanently discarded.
-
-**Step 1 — Inspect the DLQ:**
-
-```sql
-SELECT
-    jt.id AS task_id,
-    jt.job_id,
-    jt.handler_name,
-    jt.retry_count,
-    jt.max_retries,
-    jt.last_error,
-    jt.updated_at,
-    j.idempotency_key,
-    j.job_type
-FROM job_tasks jt
-JOIN jobs j ON j.id = jt.job_id
-WHERE jt.status = 'DEAD_LETTER'
-ORDER BY jt.updated_at DESC;
-```
-
-**Step 2a — Replay a dead-lettered task (re-queue it):**
-
-This resets the task to `PENDING` and clears its retry counter, giving it a fresh `max_retries` budget. Only do this after the underlying bug that caused the failures has been fixed.
-
+If the Watchdog is stopped or disconnected, manually trigger recovery:
 ```sql
 BEGIN;
 
 UPDATE job_tasks
-SET
-    status = 'PENDING',
+SET status = 'PENDING',
+    retry_count = retry_count + 1,
+    locked_by = NULL,
+    heartbeat_at = NULL,
+    last_error = 'Manual recovery: worker crash confirmed by SRE'
+WHERE id = '<task_uuid>'
+  AND status = 'RUNNING';
+
+COMMIT;
+```
+
+---
+
+### 1.5 Redis Failover & Cache Degraded State
+
+**Symptom:**
+- Gateway logs show `redis cache write error` or `dial tcp :6379: connect: connection refused`.
+- Idempotency cache hit rate drops to 0%.
+
+**Operational Resilience:**
+The Go Gateway implements resilient fallthrough:
+- Redis socket timeouts or connection refusals trigger a structured WARN log.
+- Ingestion falls through to the PostgreSQL transactional outbox (`INSERT ... ON CONFLICT (idempotency_key) DO NOTHING`).
+- Zero HTTP 500 errors are returned to clients.
+- When Redis recovers, sub-millisecond fast-path deduplication restores immediately without restarting services.
+
+---
+
+### 1.6 Clearing & Replaying Dead-Lettered (DLQ) Tasks
+
+**Step 1 — Inspect Dead-Letter Queue**:
+```sql
+SELECT jt.id AS task_id, jt.job_id, jt.handler_name, jt.retry_count, jt.last_error, jt.updated_at
+FROM job_tasks jt
+WHERE jt.status = 'DEAD_LETTER'
+ORDER BY jt.updated_at DESC
+LIMIT 50;
+```
+
+**Step 2 — Replay Fixed Tasks**:
+After deploying a bug fix or recovering an external dependency:
+```sql
+BEGIN;
+
+UPDATE job_tasks
+SET status = 'PENDING',
     retry_count = 0,
     locked_by = NULL,
     heartbeat_at = NULL,
@@ -303,25 +231,9 @@ SET
 WHERE id = '<task_uuid>'
   AND status = 'DEAD_LETTER';
 
--- Also reset the parent job status so it doesn't remain FAILED
 UPDATE jobs
 SET status = 'PENDING'
 WHERE id = (SELECT job_id FROM job_tasks WHERE id = '<task_uuid>');
-
-COMMIT;
-```
-
-**Step 2b — Permanently discard a dead-lettered task:**
-
-```sql
-BEGIN;
-
-DELETE FROM job_tasks WHERE id = '<task_uuid>' AND status = 'DEAD_LETTER';
-
--- If the parent job has no remaining tasks, optionally clean up the job row
-DELETE FROM jobs
-WHERE id = '<job_uuid>'
-  AND NOT EXISTS (SELECT 1 FROM job_tasks WHERE job_id = '<job_uuid>');
 
 COMMIT;
 ```
@@ -330,217 +242,101 @@ COMMIT;
 
 ## 2. Diagnostic SQL Recipes
 
-### 2.1 Stale Heartbeat Detection
-
-Tasks currently `RUNNING` with a heartbeat older than the Watchdog timeout (30 seconds):
+### 2.1 Partition Health & Row Distribution
+Checks row count distribution across all monthly partitions:
 
 ```sql
 SELECT
-    id,
-    job_id,
-    handler_name,
+    inhrelid::regclass AS partition_name,
+    c.reltuples::bigint AS estimated_row_count,
+    pg_size_pretty(pg_total_relation_size(inhrelid)) AS total_size
+FROM pg_inherits
+JOIN pg_class c ON c.oid = inhrelid
+WHERE inhparent = 'job_tasks'::regclass
+ORDER BY partition_name;
+```
+
+### 2.2 Active Worker Leases (Go vs. Python Runtimes)
+Monitors how many tasks each worker instance currently holds in flight:
+
+```sql
+SELECT
     locked_by,
-    heartbeat_at,
-    EXTRACT(EPOCH FROM (NOW() - heartbeat_at)) AS seconds_stale,
-    retry_count,
-    max_retries
+    count(*) AS active_tasks,
+    min(heartbeat_at) AS oldest_heartbeat,
+    max(heartbeat_at) AS newest_heartbeat,
+    round(extract(epoch from (now() - min(heartbeat_at)))::numeric, 1) AS max_staleness_sec
 FROM job_tasks
 WHERE status = 'RUNNING'
-  AND (
-      heartbeat_at < NOW() - INTERVAL '30 seconds'
-      OR heartbeat_at IS NULL
-  )
+GROUP BY locked_by
+ORDER BY active_tasks DESC;
+```
+
+### 2.3 Stale Heartbeat Detection (>30s)
+Identifies tasks that have missed 3 consecutive heartbeat cycles:
+
+```sql
+SELECT id, job_id, handler_name, locked_by, heartbeat_at,
+       round(extract(epoch from (now() - heartbeat_at))::numeric, 1) AS seconds_stale
+FROM job_tasks
+WHERE status = 'RUNNING'
+  AND (heartbeat_at < now() - interval '30 seconds' OR heartbeat_at IS NULL)
 ORDER BY heartbeat_at ASC NULLS FIRST;
 ```
 
-This is exactly the condition the Watchdog scans. If this query returns rows and the Watchdog is running, it will reclaim them within 15 seconds (the next `interval` tick).
-
----
-
-### 2.2 Worker Claim Contention
-
-Distribution of tasks by the worker that claimed them (useful for identifying unbalanced workers):
+### 2.4 Lock Contention & Worker Throughput
+Measures task completion throughput per minute over the last 15 minutes:
 
 ```sql
 SELECT
-    locked_by AS worker_id,
-    COUNT(*) AS tasks_held,
-    MIN(heartbeat_at) AS oldest_heartbeat,
-    MAX(heartbeat_at) AS newest_heartbeat
-FROM job_tasks
-WHERE status = 'RUNNING'
-GROUP BY locked_by
-ORDER BY tasks_held DESC;
-```
-
-Throughput per worker (completed tasks in the last hour):
-
-```sql
-SELECT
-    locked_by AS worker_id,
-    COUNT(*) AS tasks_completed_last_hour
+    date_trunc('minute', updated_at) AS minute,
+    count(*) AS completed_tasks,
+    count(DISTINCT locked_by) AS active_workers
 FROM job_tasks
 WHERE status = 'COMPLETED'
-  AND updated_at > NOW() - INTERVAL '1 hour'
-GROUP BY locked_by
-ORDER BY tasks_completed_last_hour DESC;
+  AND updated_at > now() - interval '15 minutes'
+GROUP BY 1
+ORDER BY minute DESC;
 ```
 
----
-
-### 2.3 Failure & DLQ Distribution
-
-Overall task status distribution:
+### 2.5 Index Scan Verification
+Verifies that query planner is actively using partial hot-path indexes:
 
 ```sql
 SELECT
-    status,
-    COUNT(*) AS count,
-    ROUND(100.0 * COUNT(*) / SUM(COUNT(*)) OVER (), 2) AS pct
-FROM job_tasks
-GROUP BY status
-ORDER BY count DESC;
-```
-
-Failure distribution by handler and error message:
-
-```sql
-SELECT
-    handler_name,
-    last_error,
-    COUNT(*) AS occurrences
-FROM job_tasks
-WHERE status IN ('DEAD_LETTER', 'FAILED')
-GROUP BY handler_name, last_error
-ORDER BY occurrences DESC;
-```
-
-Tasks that have been retried the maximum number of times and are now in DLQ:
-
-```sql
-SELECT
-    handler_name,
-    COUNT(*) AS dlq_count,
-    MAX(updated_at) AS most_recent_dlq
-FROM job_tasks
-WHERE status = 'DEAD_LETTER'
-  AND retry_count >= max_retries
-GROUP BY handler_name
-ORDER BY dlq_count DESC;
-```
-
----
-
-### 2.4 Task Throughput Over Time
-
-Completed tasks per minute (last 30 minutes), broken down by handler:
-
-```sql
-SELECT
-    DATE_TRUNC('minute', updated_at) AS minute_bucket,
-    handler_name,
-    COUNT(*) AS completed
-FROM job_tasks
-WHERE status = 'COMPLETED'
-  AND updated_at > NOW() - INTERVAL '30 minutes'
-GROUP BY minute_bucket, handler_name
-ORDER BY minute_bucket DESC, handler_name;
-```
-
-Ingestion rate — new jobs per minute (last 30 minutes):
-
-```sql
-SELECT
-    DATE_TRUNC('minute', created_at) AS minute_bucket,
-    COUNT(*) AS jobs_created
-FROM jobs
-WHERE created_at > NOW() - INTERVAL '30 minutes'
-GROUP BY minute_bucket
-ORDER BY minute_bucket DESC;
-```
-
----
-
-### 2.5 Index Usage Verification
-
-Confirm that the hot-path indexes are being used by the planner:
-
-```sql
--- Verify SKIP LOCKED worker poll uses ix_job_tasks_pending_running
-EXPLAIN (ANALYZE, BUFFERS)
-SELECT * FROM job_tasks
-WHERE status = 'PENDING'
-ORDER BY created_at ASC
-LIMIT 10
-FOR UPDATE SKIP LOCKED;
-```
-
-Expected: `Index Scan using ix_job_tasks_pending_running on job_tasks`.
-
-```sql
--- Verify idempotency key lookup uses ix_jobs_idempotency_key
-EXPLAIN (ANALYZE, BUFFERS)
-SELECT * FROM jobs
-WHERE idempotency_key = 'test-key-001';
-```
-
-Expected: `Index Scan using ix_jobs_idempotency_key on jobs`.
-
-```sql
--- Check actual index usage statistics
-SELECT
-    indexname,
+    indexrelname AS index_name,
     idx_scan AS index_scans,
     idx_tup_read AS tuples_read,
     idx_tup_fetch AS tuples_fetched
 FROM pg_stat_user_indexes
 WHERE relname IN ('jobs', 'job_tasks')
-ORDER BY relname, idx_scan DESC;
+ORDER BY idx_scan DESC;
 ```
 
 ---
 
 ## 3. Alert Response Playbooks
 
-### Alert: `orchestrator_reclaimed_orphans_total` Rate > 1/min
+### Alert: `GatewayLatencyHigh` (p95 > 2.0s over 5m)
+- **Severity**: Warning
+- **Playbook**:
+  1. Check `pg_stat_activity` for connection pool saturation (§1.1).
+  2. Verify Redis fast-path hit rate. If hit rate dropped from ~70% to 0%, check Redis health (§1.5).
+  3. Verify PostgreSQL storage I/O and CPU utilization.
 
-**Severity:** Warning  
-**Likely cause:** Workers are crashing or losing PostgreSQL connectivity before completing tasks.
+### Alert: `WatchdogOrphanReclamationSpike` (> 0.033 / sec over 5m)
+- **Severity**: Critical
+- **Playbook**:
+  1. Execute Stale Heartbeat query (§2.3) to see which workers are dropping tasks.
+  2. Inspect worker host logs for out-of-memory (OOM) kills or segmentation faults.
+  3. Verify network connectivity between worker hosts and PostgreSQL.
 
-**Response:**
-1. Check worker process logs for exceptions or `ConnectionError` messages.
-2. Run §2.1 stale heartbeat query to see current orphan count.
-3. Check PostgreSQL connection pool health (§1.2).
-4. If isolated to one worker: restart that worker instance.
-5. If systemic: investigate infrastructure (memory pressure, network partitioning).
-
----
-
-### Alert: `orchestrator_tasks_total{status="DEAD_LETTER"}` Rate > 0
-
-**Severity:** Critical (immediate review)  
-**Likely cause:** A handler is throwing unretriable errors (bad payload, external API down, schema mismatch).
-
-**Response:**
-1. Run the failure distribution query (§2.3) to identify the handler and error pattern.
-2. If the error is transient (e.g., external service briefly down): replay affected tasks (§1.5).
-3. If the error is a code bug: fix the handler, deploy, then replay tasks.
-4. If the payload is malformed: discard the task (§1.5) and identify the upstream source of bad data.
-
----
-
-### Alert: `orchestrator_execution_duration_seconds` p99 > 10s
-
-**Severity:** Warning  
-**Likely cause:** Handler is running longer than the heartbeat interval, risking false watchdog reclamation.
-
-**Response:**
-1. Identify which handler (`payment_handler` vs `compute_handler`) is slow using:
-   ```promql
-   histogram_quantile(0.99,
-     rate(orchestrator_execution_duration_seconds_bucket[5m])
-   ) by (handler)
-   ```
-2. Profile the handler logic for blocking calls (synchronous I/O, CPU-bound work without `await`).
-3. If the handler must legitimately take > 10s: reduce the heartbeat interval (`timeout=10.0` in `_heartbeat_loop`) or increase the Watchdog timeout (`Watchdog(timeout=60)`).
-4. Do **not** simply increase the Watchdog timeout without also ensuring the heartbeat renewal runs more frequently — the gap must always be: `heartbeat_interval << watchdog_timeout`.
+### Alert: `DeadLetterQueueGrowth` (> 5 / min)
+- **Severity**: Critical
+- **Playbook**:
+  1. Query DLQ failure reasons:
+     ```sql
+     SELECT last_error, count(*) FROM job_tasks WHERE status = 'DEAD_LETTER' GROUP BY last_error ORDER BY count(*) DESC;
+     ```
+  2. If errors cite third-party upstream API timeouts (e.g. payment gateway), check third-party status.
+  3. If errors cite code exceptions, page backend engineering team with stack trace from `last_error`.
