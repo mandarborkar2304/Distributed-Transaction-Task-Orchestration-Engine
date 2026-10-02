@@ -1,0 +1,37 @@
+# ── Stage 1: Build ─────────────────────────────────────────────────────────────
+FROM golang:1.22-alpine AS builder
+
+RUN apk add --no-cache git ca-certificates
+
+WORKDIR /src
+
+# Copy module files first so layer is cached when only source changes.
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+# Build both binaries as static executables (CGO disabled for Alpine scratch).
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -o /bin/gateway ./cmd/gateway/
+
+RUN CGO_ENABLED=0 GOOS=linux GOARCH=amd64 \
+    go build -ldflags="-s -w" -o /bin/worker ./cmd/worker/
+
+# ── Stage 2: Gateway runtime image ─────────────────────────────────────────────
+FROM scratch AS gateway
+
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /bin/gateway /gateway
+
+EXPOSE 8080
+
+ENTRYPOINT ["/gateway"]
+
+# ── Stage 3: Worker runtime image ──────────────────────────────────────────────
+FROM scratch AS worker
+
+COPY --from=builder /etc/ssl/certs/ca-certificates.crt /etc/ssl/certs/
+COPY --from=builder /bin/worker /worker
+
+ENTRYPOINT ["/worker"]

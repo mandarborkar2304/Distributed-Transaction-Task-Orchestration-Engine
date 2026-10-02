@@ -70,4 +70,9 @@ class JobTask(Base):
             postgresql_where=text("status IN ('PENDING', 'RUNNING')")
         ),
         Index("ix_job_tasks_job_id", "job_id"),
+        Index(
+            "ix_job_tasks_heartbeat_at",
+            "heartbeat_at",
+            postgresql_where=text("heartbeat_at IS NOT NULL")
+        ),
     )

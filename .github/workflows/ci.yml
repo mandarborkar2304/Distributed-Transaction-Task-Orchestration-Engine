@@ -7,8 +7,9 @@ on:
     branches: [main]
 
 jobs:
-  test:
-    name: Test Suite — Python 3.11 / PostgreSQL 16 / Redis 7
+  # ── Python test suite ───────────────────────────────────────────────────────
+  python-tests:
+    name: Python Tests — 3.11 / PostgreSQL 16 / Redis 7
     runs-on: ubuntu-latest
 
     services:
@@ -55,3 +56,170 @@ jobs:
 
       - name: Run test suite
         run: pytest tests/ -v
+
+  # ── Go build & vet ──────────────────────────────────────────────────────────
+  go-build:
+    name: Go Build & Vet — gateway + worker
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: services/gateway
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/gateway/go.mod
+          cache-dependency-path: services/gateway/go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Vet gateway
+        run: go vet ./cmd/gateway/...
+
+      - name: Vet worker
+        run: go vet ./cmd/worker/...
+
+      - name: Vet internal packages
+        run: go vet ./internal/...
+
+      - name: Build gateway binary
+        run: go build -o /tmp/gateway ./cmd/gateway/
+
+      - name: Build worker binary
+        run: go build -o /tmp/worker ./cmd/worker/
+
+      - name: Verify binaries exist and are executable
+        run: |
+          test -x /tmp/gateway && echo "gateway OK"
+          test -x /tmp/worker  && echo "worker OK"
+
+  # ── Go integration smoke test (gateway + live services) ─────────────────────
+  go-integration:
+    name: Go Gateway Smoke Test — live PostgreSQL & Redis
+    runs-on: ubuntu-latest
+    needs: go-build
+
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: orchestrator
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d orchestrator"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+
+    defaults:
+      run:
+        working-directory: services/gateway
+
+    env:
+      DATABASE_DSN: postgres://postgres:postgres@localhost:5432/orchestrator
+      REDIS_ADDR: localhost:6379
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: services/gateway/go.mod
+          cache-dependency-path: services/gateway/go.sum
+
+      - name: Set up Python 3.11 (for schema init)
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install Python deps (schema init only)
+        run: pip install -r ../../requirements.txt
+        working-directory: .
+
+      - name: Initialise database schema
+        env:
+          DATABASE_URL: postgresql+asyncpg://postgres:postgres@localhost:5432/orchestrator
+          REDIS_URL: redis://localhost:6379/0
+        run: |
+          python - <<'EOF'
+          import asyncio
+          from src.database import engine, Base
+          from src import models  # noqa: F401 — registers all ORM models
+
+          async def init():
+              async with engine.begin() as conn:
+                  await conn.run_sync(Base.metadata.create_all)
+          asyncio.run(init())
+          EOF
+        working-directory: ../../
+
+      - name: Build gateway binary
+        run: go build -o /tmp/gateway ./cmd/gateway/
+
+      - name: Start gateway in background
+        run: |
+          DATABASE_DSN="$DATABASE_DSN" REDIS_ADDR="$REDIS_ADDR" GATEWAY_ADDR=":8080" \
+            /tmp/gateway &
+          echo $! > /tmp/gateway.pid
+          sleep 3  # allow server to bind
+
+      - name: Health probe
+        run: curl -sf http://localhost:8080/healthz
+
+      - name: Submit job — first request (expect cached=false)
+        run: |
+          RESP=$(curl -sf -X POST http://localhost:8080/v1/jobs \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: ci-smoke-001" \
+            -d '{"job_type":"ci","handler_name":"compute_handler","payload":{}}')
+          echo "$RESP"
+          echo "$RESP" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          assert d['cached'] == False, f'Expected cached=false, got {d}'
+          assert d['status'] == 'PENDING', f'Expected PENDING, got {d}'
+          print('First request: PASS')
+          "
+
+      - name: Submit job — duplicate (expect cached=true)
+        run: |
+          RESP=$(curl -sf -X POST http://localhost:8080/v1/jobs \
+            -H "Content-Type: application/json" \
+            -H "Idempotency-Key: ci-smoke-001" \
+            -d '{"job_type":"ci","handler_name":"compute_handler","payload":{}}')
+          echo "$RESP"
+          echo "$RESP" | python3 -c "
+          import sys, json
+          d = json.load(sys.stdin)
+          assert d['cached'] == True, f'Expected cached=true, got {d}'
+          print('Idempotency dedup: PASS')
+          "
+
+      - name: Metrics endpoint reachable
+        run: curl -sf http://localhost:8080/metrics | grep gateway_requests_total
+
+      - name: Teardown gateway
+        if: always()
+        run: kill $(cat /tmp/gateway.pid) 2>/dev/null || true
+

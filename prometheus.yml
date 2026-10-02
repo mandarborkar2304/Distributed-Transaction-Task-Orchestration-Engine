@@ -2,6 +2,10 @@ global:
   scrape_interval: 5s
 
 scrape_configs:
-  - job_name: 'orchestrator'
+  - job_name: 'python-api'
     static_configs:
-      - targets: ['host.docker.internal:8000']
+      - targets: ['python-api:8000']
+
+  - job_name: 'go-gateway'
+    static_configs:
+      - targets: ['gateway:8080']

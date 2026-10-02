@@ -395,3 +395,69 @@ redis_client = redis.from_url(settings.REDIS_URL, decode_responses=True, max_con
 ```
 
 `max_connections=1000` allows the worker pool (40+ concurrent coroutines × multiple awaits per task) and the API layer to coexist without `MaxConnectionsError`. Redis connections are much lighter than PostgreSQL connections (no authentication handshake on each request).
+
+---
+
+## 6. Hybrid Go + Python Polyglot Architecture (20M+ Scale)
+
+To sustain high-throughput ingestion and queue-claiming for an enterprise footprint of 20M+ users without being constrained by the Python GIL or asyncio event loop overhead, the architecture introduces a native Go acceleration layer while retaining Python for specialized handler orchestration.
+
+### 6.1 Go Ingestion Gateway (`services/gateway/cmd/gateway`)
+
+The Go gateway provides native goroutine-per-request concurrency and sub-millisecond idempotency deduplication:
+
+1. **Lightweight Concurrency**: Each incoming `POST /v1/jobs` request is handled by an independent goroutine, eliminating event loop head-of-line blocking.
+2. **Sub-Millisecond Redis Fast-Path**: Using `github.com/redis/go-redis/v9` with a connection pool of 500 connections (`PoolSize: 500, MinIdleConns: 25`), idempotency checks (`idemp:{key}`) return cached responses in <1ms without database access.
+3. **Connection-Pooled PostgreSQL Writes (`pgxpool`)**:
+   ```go
+   cfg.MaxConns = 150
+   cfg.MinConns = 25
+   cfg.MaxConnLifetime = 30 * time.Minute
+   cfg.MaxConnIdleTime = 5 * time.Minute
+   cfg.HealthCheckPeriod = 60 * time.Second
+   ```
+   `pgx/v5` raw binary protocol execution bypasses ORM serialization overhead, writing directly to the transactional outbox (`jobs` + `job_tasks`) using atomic `INSERT ... ON CONFLICT DO NOTHING RETURNING` transactions.
+4. **Prometheus Instrumentation**: Exposes `gateway_requests_total`, `gateway_latency_seconds` histogram buckets, and `gateway_idempotency_hits_total` on `GET /metrics`.
+
+### 6.2 High-Performance Go Worker Pool (`services/gateway/cmd/worker`)
+
+The Go worker implements an autonomous task consumption loop:
+
+1. **Atomic Batch Claiming**: Executes `SELECT ... FOR UPDATE SKIP LOCKED` with a batch size of 50 tasks in a single Read Committed transaction, updating status to `RUNNING`, assigning `locked_by = worker_id`, and setting initial `heartbeat_at = now()`.
+2. **Redis Lock Lease**: For each claimed task, an atomic `SET lock:task:{id} {worker_id} NX EX 60` lock is acquired.
+3. **Non-Blocking Heartbeat Ticker**: An autonomous goroutine runs a `time.NewTicker(10 * time.Second)` that renews both the database `heartbeat_at` timestamp and the Redis lock TTL every 10 seconds until task completion.
+4. **Graceful Shutdown**: Intercepts `SIGINT` / `SIGTERM`, waits for in-flight tasks via `sync.WaitGroup`, and executes state updates using an independent shutdown context.
+
+### 6.3 Polyglot Coordination Contract
+
+The Go and Python layers share a unified PostgreSQL and Redis contract:
+
+```
+┌────────────────────────────────────────────────────────┐
+│             Shared Database & Queue Contract           │
+├────────────────────────────────────────────────────────┤
+│ PostgreSQL:                                            │
+│   jobs(id, idempotency_key, job_type, status)          │
+│   job_tasks(id, job_id, handler_name, status, payload) │
+│                                                        │
+│ Redis:                                                 │
+│   idemp:{idempotency_key} -> cached JSON (TTL=86400s)  │
+│   lock:task:{task_id}     -> worker_id   (TTL=60s)     │
+└────────────────────────────────────────────────────────┘
+```
+
+- **Go-Native Tasks**: Handlers registered in Go (`compute_handler`, `payment_handler`) execute with native speed and sub-millisecond dispatch.
+- **Python Delegation**: If a task requires Python libraries (e.g. data science, legacy integrations), the Go worker detects an unrecognised handler and leaves it in `PENDING` for the Python worker pool, or the job is routed to the Python API (`:8000`).
+
+### 6.4 Declarative Range Partitioning Strategy (20M+ Rows)
+
+At 20,000,000+ lifetime tasks, a single B-Tree index on `job_tasks` exceeds memory cache capacity, leading to cache eviction and degraded worker poll performance.
+
+The engine includes declarative range partitioning ready for production deployment:
+- **Partition Key**: `RANGE (created_at)` with monthly partition tables (`job_tasks_YYYY_MM`).
+- **Pruning Efficiency**: Worker polls filtering on `WHERE status IN ('PENDING', 'RUNNING') ORDER BY created_at` naturally isolate to the active month's partition.
+- **Index Optimization**:
+  - Partial index `ix_job_tasks_pending_running` indexes *only* active tasks (`WHERE status IN ('PENDING', 'RUNNING')`), keeping the hot index under a few megabytes regardless of millions of completed rows.
+  - Partial index `ix_job_tasks_heartbeat_at` indexes *only* non-null heartbeats (`WHERE heartbeat_at IS NOT NULL`), preventing index bloat from completed/pending tasks.
+- **Migration Script**: Documented in [`docs/migrations/001_partition_job_tasks.sql`](migrations/001_partition_job_tasks.sql).
+

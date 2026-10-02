@@ -11,3 +11,9 @@ htmlcov/
 # Local environment
 venv/
 .env
+
+# Go binaries
+services/gateway/gateway
+services/gateway/worker
+*.exe
+
